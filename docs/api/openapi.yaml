@@ -1,0 +1,165 @@
+openapi: 3.0.3
+info:
+  title: FinPilot API
+  description: Internal Investment Portfolio & Goal Monitoring API
+  version: 1.0.0
+paths:
+  /api/v1/auth/login/:
+    post:
+      summary: Authenticate user & issue JWT
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email, password]
+              properties:
+                email:
+                  type: string
+                password:
+                  type: string
+      responses:
+        '200':
+          description: Successful login
+          content:
+            application/json:
+              example:
+                data:
+                  access: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+                  user:
+                    id: 1
+                    email: "admin@finpilot.local"
+                    full_name: "FinPilot Admin"
+                    user_type: "ADMIN"
+                status: "success"
+                action_code: "DO_NOTHING"
+
+  /api/v1/customers/:
+    get:
+      summary: Paginated list of customers
+      parameters:
+        - name: search
+          in: query
+          schema:
+            type: string
+        - name: kyc_status
+          in: query
+          schema:
+            type: string
+            enum: [VERIFIED, PENDING, REVIEW]
+        - name: segment
+          in: query
+          schema:
+            type: string
+            enum: [MASS, AFFLUENT, HNI]
+      responses:
+        '200':
+          description: Customer results
+
+  /api/v1/customers/{customer_code}/portfolio/:
+    get:
+      summary: Consolidated customer portfolio
+      parameters:
+        - name: customer_code
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Consolidated portfolio valuation
+          content:
+            application/json:
+              example:
+                data:
+                  customer_code: "C0014"
+                  currency: "INR"
+                  as_of:
+                    snapshot_date: "2026-09-18"
+                    price_date: "2026-09-18"
+                    stale: true
+                    age_days: 57
+                  totals:
+                    market_value: "1234567.89"
+                    cost_value: "1100000.00"
+                    unrealised_pl: "134567.89"
+                    unrealised_pl_pct: "12.23"
+                  allocation:
+                    - asset_class: "EQUITY"
+                      market_value: "700000.00"
+                      weight_pct: "56.70"
+                  accounts:
+                    - account_code: "A00018"
+                      account_type: "RETIREMENT"
+                      provider: "BlueRiver MF"
+                      status: "ACTIVE"
+                      opened_at: "2026-01-15"
+                      totals:
+                        market_value: "22602.09"
+                        cost_value: "21462.75"
+                        unrealised_pl: "1139.34"
+                        unrealised_pl_pct: "5.31"
+                      positions:
+                        - instrument_code: "I0046"
+                          symbol: "EQ046"
+                          name: "FinPilot Equity 46"
+                          asset_class: "EQUITY"
+                          quantity: "161.160000"
+                          avg_cost: "133.1800"
+                          last_price: "140.2500"
+                          market_value: "22602.09"
+                          unrealised_pl: "1139.34"
+                          unrealised_pl_pct: "5.31"
+                status: "success"
+                action_code: "DO_NOTHING"
+
+  /api/v1/admin/imports/transactions/:
+    post:
+      summary: Upload and ingest transactions CSV (Admin only)
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                file:
+                  type: string
+                  format: binary
+                dry_run:
+                  type: boolean
+      responses:
+        '201':
+          description: Ingestion result summary
+          content:
+            application/json:
+              example:
+                data:
+                  batch: "9b1deb4d-3b7d-4bad-9bdd-2b0d7b3dcb6d"
+                  import_type: "TRANSACTIONS"
+                  dry_run: false
+                  status: "COMPLETED_WITH_ERRORS"
+                  counts:
+                    total: 4554
+                    imported: 4550
+                    skipped_duplicate: 1
+                    rejected: 3
+                  warnings:
+                    TXN_BEFORE_ACCOUNT_OPEN: 1069
+                    TXN_ON_CLOSED_ACCOUNT: 115
+                  rejected_rows:
+                    - row: 4553
+                      code: "UNKNOWN_INSTRUMENT"
+                      field: "instrument_id"
+                      message: "Instrument 'I9999' does not exist."
+                    - row: 4554
+                      code: "NEGATIVE_AMOUNT"
+                      field: "amount"
+                      message: "Amount must be >= 0 (got -75)."
+                    - row: 4555
+                      code: "FUTURE_TRADE_DATE"
+                      field: "trade_date"
+                      message: "Trade date 2027-01-05 is in the future."
+                status: "success"
+                action_code: "DO_NOTHING"
