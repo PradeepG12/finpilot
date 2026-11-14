@@ -1,0 +1,62 @@
+version: "3.9"
+
+services:
+  db:
+    image: postgres:16
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-finpilot}
+      POSTGRES_USER: ${POSTGRES_USER:-finpilot}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-finpilot_dev_password_change_in_prod}
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-finpilot} -d ${POSTGRES_DB:-finpilot}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    networks:
+      - finpilot_network
+
+  api:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    env_file:
+      - .env
+    environment:
+      - DJANGO_SETTINGS_MODULE=config.settings.deployment
+    volumes:
+      - ./data/seed:/app/data/seed:ro
+    depends_on:
+      db:
+        condition: service_healthy
+    ports:
+      - "8000:8000"
+    networks:
+      - finpilot_network
+    healthcheck:
+      test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://localhost:8000/api/v1/health/')\" 2>/dev/null && echo OK"]
+      interval: 15s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
+
+  web:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    ports:
+      - "8080:80"
+    depends_on:
+      - api
+    networks:
+      - finpilot_network
+
+volumes:
+  postgres_data:
+
+networks:
+  finpilot_network:
+    driver: bridge

@@ -1,0 +1,94 @@
+name: Tests
+
+on:
+  pull_request:
+    branches: [staging]
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  pytest:
+    name: Run test suite
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_DB: app_test
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+      redis:
+        image: redis:7
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    env:
+      DJANGO_SECRET_KEY: ci-dummy-secret-key
+      JWT_SIGNING_SECRET_KEY: ci-dummy-jwt-key
+      POSTGRES_DB: app_test
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_HOST: localhost
+      POSTGRES_PORT: "5432"
+      CELERY_BROKER_URL: redis://localhost:6379/0
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+          cache: pip
+
+      - name: Install dependencies
+        run: pip install -r requirements-dev.txt
+
+      - name: Run tests
+        id: pytest
+        run: |
+          set -o pipefail
+          pytest --no-header -p no:cacheprovider 2>&1 | tee pytest-output.txt
+
+      - name: Build PR comment
+        if: always() && github.event_name == 'pull_request'
+        run: |
+          {
+            if [ "${{ steps.pytest.outcome }}" = "success" ]; then
+              echo "## ✅ Tests passed"
+              echo ""
+              echo "All test cases passed for this PR."
+            else
+              echo "## ❌ Tests failed"
+              echo ""
+              echo "The test suite did not pass. Summary below — see the full log in the"
+              echo "[Actions run](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})."
+              echo ""
+              echo '```'
+              tail -n 40 pytest-output.txt
+              echo '```'
+            fi
+          } > pr-comment.md
+
+      - name: Post sticky PR comment
+        if: always() && github.event_name == 'pull_request'
+        uses: marocchino/sticky-pull-request-comment@v2
+        with:
+          header: test-results
+          path: pr-comment.md

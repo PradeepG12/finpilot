@@ -1,0 +1,81 @@
+# General
+# ----------------------------------------------------------------
+PROJECT_NAME=
+ENVIRONMENT=
+DJANGO_DEBUG=
+DJANGO_SECRET_KEY=
+DJANGO_ADMIN_URL=
+DJANGO_ALLOWED_HOSTS=
+
+# Database
+# ----------------------------------------------------------------
+POSTGRES_HOST=
+POSTGRES_PORT=
+POSTGRES_DB=
+POSTGRES_USER=
+POSTGRES_PASSWORD=
+
+# Redis & Celery
+# ----------------------------------------------------------------
+CELERY_BROKER_URL=
+CELERY_RESULT_BACKEND_MAX_RETRIES=
+CELERY_WORKER_DEBUG_MODE=
+FLOWER_PORT=
+FLOWER_ADDRESS=
+FLOWER_BASIC_AUTH=
+
+# AWS & S3 (Linode object storage)
+# ----------------------------------------------------------------
+DJANGO_OBJECT_STORAGE_PROVIDER=
+DJANGO_LINODE_ACCESS_KEY_ID=
+DJANGO_LINODE_SECRET_ACCESS_KEY=
+DJANGO_LINODE_STORAGE_BUCKET_NAME=
+DJANGO_AWS_QUERYSTRING_AUTH=
+DJANGO_AWS_EXPIRY=
+DJANGO_AWS_S3_MAX_MEMORY_SIZE=
+DJANGO_LINODE_S3_REGION_NAME=
+DJANGO_AWS_S3_CUSTOM_DOMAIN=
+DJANGO_LINODE_S3_ENDPOINT_URL=
+
+# Security
+# ----------------------------------------------------------------
+DJANGO_SECURE_SSL_REDIRECT=
+SESSION_COOKIE_SECURE=
+SESSION_COOKIE_NAME=
+CSRF_COOKIE_SECURE=
+CSRF_COOKIE_NAME=
+DJANGO_CSRF_TRUSTED_ORIGINS=
+SECURE_HSTS_SECONDS=
+DJANGO_SECURE_HSTS_INCLUDE_SUBDOMAINS=
+DJANGO_SECURE_HSTS_PRELOAD=
+DJANGO_SECURE_CONTENT_TYPE_NOSNIFF=
+
+# CORS
+# ----------------------------------------------------------------
+APP_ALLOWED_CORS_HEADERS=
+CORS_ORIGIN_ALLOW_ALL=
+CORS_ALLOW_CREDENTIALS=
+CORS_ALLOWED_ORIGINS=
+CORS_ALLOWED_ORIGIN_REGEXES=
+
+# Auth Token
+# ----------------------------------------------------------------
+AUTH_TOKEN_VALIDITY_IN_HOURS=
+
+# Super Admin (seeded by init_app)
+# ----------------------------------------------------------------
+SUPER_ADMIN_EMAIL=
+SUPER_ADMIN_NAME=
+SUPER_ADMIN_PASSWORD=
+
+# Email
+# ----------------------------------------------------------------
+SEND_EMAILS=
+
+# Test Database (optional overrides for the test suite)
+# ----------------------------------------------------------------
+TEST_POSTGRES_HOST=
+TEST_POSTGRES_PORT=
+TEST_POSTGRES_DB=
+TEST_POSTGRES_USER=
+TEST_POSTGRES_PASSWORD=
