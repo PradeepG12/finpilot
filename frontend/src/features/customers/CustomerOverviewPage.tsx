@@ -1,11 +1,11 @@
 import React, { useState } from 'react';
-import { useParams } from 'react-router-dom';
+import { useParams, Link } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { apiClient } from '@/lib/api';
 import { ApiResponse, CustomerDetail, PortfolioResponse } from '@/types/api';
 import { DataFreshnessBanner } from '@/components/layout/DataFreshnessBanner';
 import { formatINR, formatPercent } from '@/lib/format';
-import { ArrowUpRight, ArrowDownRight, Layers, ShieldCheck } from 'lucide-react';
+import { ArrowLeft, ArrowUpRight, ArrowDownRight, Layers, ShieldCheck } from 'lucide-react';
 import { CustomerPortfolioTab } from '@/features/portfolio/CustomerPortfolioTab';
 import { CustomerTransactionsTab } from '@/features/transactions/CustomerTransactionsTab';
 import { CustomerGoalsTab } from '@/features/goals/CustomerGoalsTab';
@@ -42,6 +42,17 @@ export const CustomerOverviewPage: React.FC = () => {
 
   return (
     <div className="space-y-6">
+      {/* Back Button to Customer List */}
+      <div>
+        <Link
+          to="/customers"
+          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-slate-300 bg-white text-sm font-semibold text-text-main hover:bg-slate-50 transition-colors shadow-xs"
+        >
+          <ArrowLeft className="h-4 w-4" />
+          <span>Back to Customers</span>
+        </Link>
+      </div>
+
       {/* Top Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-border pb-4">
         <div>
