@@ -1,6 +1,8 @@
 import axios from 'axios';
 
 let inMemoryToken: string | null = null;
+const configuredApiBaseUrl = import.meta.env.VITE_API_BASE_URL?.trim().replace(/\/$/, '');
+const API_BASE_URL = configuredApiBaseUrl || '/api/v1';
 
 export const setAccessToken = (token: string | null) => {
   inMemoryToken = token;
@@ -9,7 +11,7 @@ export const setAccessToken = (token: string | null) => {
 export const getAccessToken = () => inMemoryToken;
 
 export const apiClient = axios.create({
-  baseURL: '/api/v1',
+  baseURL: API_BASE_URL,
   headers: {
     'Content-Type': 'application/json',
   },
@@ -64,7 +66,7 @@ apiClient.interceptors.response.use(
 
       try {
         const refreshResponse = await axios.post(
-          '/api/v1/auth/refresh/',
+          `${API_BASE_URL}/auth/refresh/`,
           {},
           { withCredentials: true }
         );

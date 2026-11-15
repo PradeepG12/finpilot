@@ -33,6 +33,7 @@ DEMO_VIEWER_PASSWORD = env.str("DEMO_VIEWER_PASSWORD", default="viewer-pass-123"
 JWT_ACCESS_MINUTES = env.int("JWT_ACCESS_MINUTES", default=15)
 JWT_REFRESH_DAYS = env.int("JWT_REFRESH_DAYS", default=7)
 COOKIE_SECURE = env.bool("COOKIE_SECURE", default=False)
+COOKIE_SAMESITE = env.str("COOKIE_SAMESITE", default="Lax")
 
 SIMPLE_JWT = {
     "ACCESS_TOKEN_LIFETIME": timedelta(minutes=JWT_ACCESS_MINUTES),
