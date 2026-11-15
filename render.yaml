@@ -65,11 +65,11 @@ services:
         fromDatabase:
           name: finpilot-db
           property: password
-      # Cookies / security (Vercel proxies /api, so cookies are same-site)
+      # Cookies / security (frontend calls the API directly, so the refresh cookie is cross-site)
       - key: COOKIE_SECURE
         value: "True"
       - key: COOKIE_SAMESITE
-        value: Lax
+        value: "None"
       - key: SESSION_COOKIE_SECURE
         value: "True"
       - key: CSRF_COOKIE_SECURE

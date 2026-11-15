@@ -97,8 +97,8 @@ Set `AUTO_SEED=false` after the first successful deploy. Keep `DJANGO_SECURE_SSL
 - Build command: `npm run build`
 - Output directory: `dist`
 - `frontend/vercel.json` proxies `/api/*` to the Render service and provides the SPA rewrite. If the Render hostname is not `finpilot-api.onrender.com`, update the proxy destination.
-- Leave `VITE_API_BASE_URL` unset. The browser then calls `/api/v1` on the Vercel domain, so the refresh cookie is same-site and `COOKIE_SAMESITE=Lax` works.
-- To call Render directly instead, set `VITE_API_BASE_URL=https://<render-hostname>/api/v1`, use `COOKIE_SAMESITE=None` with `COOKIE_SECURE=True`, and expect third-party cookie blocking in some browsers.
+- Set `VITE_API_BASE_URL=https://<render-hostname>/api/v1` in Vercel and redeploy (it is baked in at build time). `render.yaml` sets `COOKIE_SAMESITE=None` with `COOKIE_SECURE=True` for the cross-site refresh cookie; some browsers block third-party cookies, which can log users out on reload.
+- Alternative: set the Vercel Root Directory to `frontend`, leave `VITE_API_BASE_URL` unset so requests use the `/api` proxy, and set `COOKIE_SAMESITE=Lax` in `render.yaml`.
 
 The Render free tier sleeps when idle (first request takes up to a minute) and its free PostgreSQL expires after a limited period.
 
