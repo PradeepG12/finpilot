@@ -1,7 +1,7 @@
 from .base import AppAPIView, AppCreateAPIView, AppViewMixin, NonAuthenticatedAPIMixin, SortingMixin
 from .generic import (
     AppGenericViewSet,
-    AppModelCreateAPIView,
+    AppModelCreateAPIViewSet,
     AppModelCUDAPIViewSet,
     AppModelListAPIViewSet,
     AppModelRetrieveAPIViewSet,
@@ -15,7 +15,7 @@ __all__ = [
     "AppAPIView",
     "AppCreateAPIView",
     "AppGenericViewSet",
-    "AppModelCreateAPIView",
+    "AppModelCreateAPIViewSet",
     "AppModelCUDAPIViewSet",
     "AppModelListAPIViewSet",
     "AppModelRetrieveAPIViewSet",

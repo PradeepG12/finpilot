@@ -143,11 +143,37 @@ export interface ImportBatchResult {
   status: string;
   counts: {
     total: number;
+    processed?: number;
     imported: number;
     skipped_duplicate: number;
     rejected: number;
   };
   warnings: Record<string, number>;
+  rejected_rows?: Array<{
+    row: number;
+    code: string;
+    field: string | null;
+    message: string;
+  }>;
+}
+
+export interface ImportBatchDetail {
+  id: number;
+  uuid: string;
+  import_type: string;
+  file_name: string;
+  status: string;
+  is_dry_run: boolean;
+  counts: {
+    total: number;
+    processed: number;
+    imported: number;
+    skipped_duplicate: number;
+    rejected: number;
+  };
+  warnings: Record<string, number>;
+  started_at: string;
+  finished_at: string | null;
   rejected_rows?: Array<{
     row: number;
     code: string;

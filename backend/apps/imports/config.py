@@ -18,6 +18,7 @@ class ImportTypeChoices(DjangoChoices):
 class ImportStatusChoices(DjangoChoices):
     """Status of a data import batch."""
 
+    pending = ChoiceItem("PENDING", "Pending")
     processing = ChoiceItem("PROCESSING", "Processing")
     completed = ChoiceItem("COMPLETED", "Completed")
     completed_with_errors = ChoiceItem("COMPLETED_WITH_ERRORS", "Completed with Errors")

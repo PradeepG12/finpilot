@@ -35,7 +35,7 @@ class ImportService:
     def __init__(self, user=None):
         self.user = user
 
-    def import_file(self, import_type: str, file_obj, file_name: str, is_dry_run: bool = False):
+    def import_file(self, import_type: str, file_obj, file_name: str, is_dry_run: bool = False, is_async: bool = False):
         """Processes an incoming CSV file according to its import_type."""
         # Read content and compute hash
         content = file_obj.read()
@@ -63,59 +63,87 @@ class ImportService:
                     "message": f"File with identical content already imported (Batch {existing_batch.uuid})",
                 }
 
-        # Create batch record
+        # Create batch record with initial rows_total estimate
+        total_lines = max(0, len([l for l in content_str.splitlines() if l.strip()]) - 1)
         batch = ImportBatch.objects.create(
             import_type=import_type,
             file_name=file_name,
             file_sha256=file_sha256,
             status=ImportStatusChoices.dry_run if is_dry_run else ImportStatusChoices.processing,
             is_dry_run=is_dry_run,
+            rows_total=total_lines,
+            rows_processed=0,
             triggered_by=self.user,
         )
 
-        try:
-            reader = csv.DictReader(io.StringIO(content_str))
-            # Dispatch to type-specific importer
-            importers = {
-                ImportTypeChoices.instruments: self._import_instruments,
-                ImportTypeChoices.customers: self._import_customers,
-                ImportTypeChoices.risk_profiles: self._import_risk_profiles,
-                ImportTypeChoices.accounts: self._import_accounts,
-                ImportTypeChoices.goals: self._import_goals,
-                ImportTypeChoices.holdings: self._import_holdings,
-                ImportTypeChoices.transactions: self._import_transactions,
+        if is_async:
+            from apps.imports.tasks import process_import_batch_task
+            process_import_batch_task.run_task(
+                batch_uuid=str(batch.uuid),
+                content_str=content_str,
+                import_type=import_type,
+                is_dry_run=is_dry_run,
+            )
+            return {
+                "async": True,
+                "batch": batch,
+                "message": "Import task enqueued.",
             }
 
-            if import_type not in importers:
-                raise ValueError(f"Unknown import type: {import_type}")
-
-            summary = importers[import_type](batch, reader, is_dry_run)
-
-            # Update batch metadata
-            batch.rows_total = summary["total"]
-            batch.rows_imported = summary["imported"]
-            batch.rows_skipped_duplicate = summary["skipped_duplicate"]
-            batch.rows_rejected = summary["rejected"]
-            batch.warnings = summary.get("warnings", {})
-            batch.finished_at = timezone.now()
-
-            if is_dry_run:
-                batch.status = ImportStatusChoices.dry_run
-            elif batch.rows_rejected > 0:
-                batch.status = ImportStatusChoices.completed_with_errors
-            else:
-                batch.status = ImportStatusChoices.completed
-
-            batch.save()
-            summary["batch"] = batch
-            return summary
-
+        try:
+            return self.process_batch_content(
+                batch_uuid=str(batch.uuid),
+                content_str=content_str,
+                import_type=import_type,
+                is_dry_run=is_dry_run,
+            )
         except Exception as exc:
             logger.exception("Import batch %s failed unexpectedly", batch.uuid)
             batch.status = ImportStatusChoices.failed
             batch.finished_at = timezone.now()
-            batch.save()
+            batch.save(update_fields=["status", "finished_at"])
             raise
+
+    def process_batch_content(self, batch_uuid: str, content_str: str, import_type: str, is_dry_run: bool = False):
+        """Processes raw CSV content for an existing ImportBatch, updating progress incrementally."""
+        batch = ImportBatch.objects.get(uuid=batch_uuid)
+        reader = list(csv.DictReader(io.StringIO(content_str)))
+        batch.rows_total = len(reader)
+        batch.save(update_fields=["rows_total"])
+
+        importers = {
+            ImportTypeChoices.instruments: self._import_instruments,
+            ImportTypeChoices.customers: self._import_customers,
+            ImportTypeChoices.risk_profiles: self._import_risk_profiles,
+            ImportTypeChoices.accounts: self._import_accounts,
+            ImportTypeChoices.goals: self._import_goals,
+            ImportTypeChoices.holdings: self._import_holdings,
+            ImportTypeChoices.transactions: self._import_transactions,
+        }
+
+        if import_type not in importers:
+            raise ValueError(f"Unknown import type: {import_type}")
+
+        summary = importers[import_type](batch, reader, is_dry_run)
+
+        batch.rows_total = summary["total"]
+        batch.rows_processed = summary["total"]
+        batch.rows_imported = summary["imported"]
+        batch.rows_skipped_duplicate = summary["skipped_duplicate"]
+        batch.rows_rejected = summary["rejected"]
+        batch.warnings = summary.get("warnings", {})
+        batch.finished_at = timezone.now()
+
+        if is_dry_run:
+            batch.status = ImportStatusChoices.dry_run
+        elif batch.rows_rejected > 0:
+            batch.status = ImportStatusChoices.completed_with_errors
+        else:
+            batch.status = ImportStatusChoices.completed
+
+        batch.save()
+        summary["batch"] = batch
+        return summary
 
     # ---------------------------------------------------------
     # 1. INSTRUMENTS IMPORTER
@@ -132,6 +160,8 @@ class ImportService:
 
         for row_idx, row in enumerate(reader, start=2):
             total += 1
+            if total % 250 == 0:
+                ImportBatch.objects.filter(pk=batch.pk).update(rows_processed=total)
             code = (row.get("instrument_id") or "").strip()
             symbol = (row.get("symbol") or "").strip()
             name = (row.get("instrument_name") or "").strip()
@@ -187,9 +217,10 @@ class ImportService:
                     )
                 )
 
-        if not is_dry_run and to_create:
+        if not is_dry_run:
             with transaction.atomic():
-                Instrument.objects.bulk_create(to_create, batch_size=500)
+                if to_create:
+                    Instrument.objects.bulk_create(to_create, batch_size=500)
                 if row_errors:
                     ImportRowError.objects.bulk_create(row_errors, batch_size=500)
 
@@ -210,6 +241,8 @@ class ImportService:
 
         for row_idx, row in enumerate(reader, start=2):
             total += 1
+            if total % 250 == 0:
+                ImportBatch.objects.filter(pk=batch.pk).update(rows_processed=total)
             code = (row.get("customer_id") or "").strip()
             name = (row.get("full_name") or "").strip()
             email = (row.get("email") or "").strip()
@@ -253,9 +286,10 @@ class ImportService:
                     )
                 )
 
-        if not is_dry_run and to_create:
+        if not is_dry_run:
             with transaction.atomic():
-                Customer.objects.bulk_create(to_create, batch_size=500)
+                if to_create:
+                    Customer.objects.bulk_create(to_create, batch_size=500)
                 if row_errors:
                     ImportRowError.objects.bulk_create(row_errors, batch_size=500)
 
@@ -277,6 +311,8 @@ class ImportService:
 
         for row_idx, row in enumerate(reader, start=2):
             total += 1
+            if total % 250 == 0:
+                ImportBatch.objects.filter(pk=batch.pk).update(rows_processed=total)
             cust_code = (row.get("customer_id") or "").strip()
             score_str = (row.get("risk_score") or "").strip()
             level = (row.get("risk_level") or "").strip().upper()
@@ -327,9 +363,10 @@ class ImportService:
                     )
                 )
 
-        if not is_dry_run and to_create:
+        if not is_dry_run:
             with transaction.atomic():
-                RiskProfile.objects.bulk_create(to_create, batch_size=500)
+                if to_create:
+                    RiskProfile.objects.bulk_create(to_create, batch_size=500)
                 if row_errors:
                     ImportRowError.objects.bulk_create(row_errors, batch_size=500)
 
@@ -351,6 +388,8 @@ class ImportService:
 
         for row_idx, row in enumerate(reader, start=2):
             total += 1
+            if total % 250 == 0:
+                ImportBatch.objects.filter(pk=batch.pk).update(rows_processed=total)
             code = (row.get("account_id") or "").strip()
             cust_code = (row.get("customer_id") or "").strip()
             acc_type = (row.get("account_type") or "").strip().upper()
@@ -389,9 +428,10 @@ class ImportService:
                     )
                 )
 
-        if not is_dry_run and to_create:
+        if not is_dry_run:
             with transaction.atomic():
-                Account.objects.bulk_create(to_create, batch_size=500)
+                if to_create:
+                    Account.objects.bulk_create(to_create, batch_size=500)
                 if row_errors:
                     ImportRowError.objects.bulk_create(row_errors, batch_size=500)
 
@@ -413,6 +453,8 @@ class ImportService:
 
         for row_idx, row in enumerate(reader, start=2):
             total += 1
+            if total % 250 == 0:
+                ImportBatch.objects.filter(pk=batch.pk).update(rows_processed=total)
             code = (row.get("goal_id") or "").strip()
             cust_code = (row.get("customer_id") or "").strip()
             goal_type = (row.get("goal_type") or "").strip().upper()
@@ -466,12 +508,12 @@ class ImportService:
                     )
                 )
 
-        if not is_dry_run and to_create:
+        if not is_dry_run:
             with transaction.atomic():
-                Goal.objects.bulk_create(to_create, batch_size=500)
-                # Ensure sequence is synchronized after loading goals
-                with connection.cursor() as cursor:
-                    cursor.execute("SELECT setval('goals_goal_code_seq', (SELECT COALESCE(MAX(SUBSTRING(goal_code FROM 2)::integer), 177) + 1 FROM goals_goal));")
+                if to_create:
+                    Goal.objects.bulk_create(to_create, batch_size=500)
+                    with connection.cursor() as cursor:
+                        cursor.execute("SELECT setval('goals_goal_code_seq', (SELECT COALESCE(MAX(SUBSTRING(goal_code FROM 2)::integer), 177) + 1 FROM goals_goal));")
                 if row_errors:
                     ImportRowError.objects.bulk_create(row_errors, batch_size=500)
 
@@ -497,6 +539,8 @@ class ImportService:
 
         for row_idx, row in enumerate(reader, start=2):
             total += 1
+            if total % 250 == 0:
+                ImportBatch.objects.filter(pk=batch.pk).update(rows_processed=total)
             acc_code = (row.get("account_id") or "").strip()
             inst_code = (row.get("instrument_id") or "").strip()
             qty_str = (row.get("quantity") or "").strip()
@@ -558,9 +602,10 @@ class ImportService:
                     )
                 )
 
-        if not is_dry_run and to_create:
+        if not is_dry_run:
             with transaction.atomic():
-                HoldingSnapshot.objects.bulk_create(to_create, batch_size=1000)
+                if to_create:
+                    HoldingSnapshot.objects.bulk_create(to_create, batch_size=1000)
                 if row_errors:
                     ImportRowError.objects.bulk_create(row_errors, batch_size=1000)
 
@@ -598,6 +643,8 @@ class ImportService:
 
         for row_idx, row in enumerate(reader, start=2):
             total += 1
+            if total % 250 == 0:
+                ImportBatch.objects.filter(pk=batch.pk).update(rows_processed=total)
             txn_code = (row.get("transaction_id") or "").strip()
             acc_code = (row.get("account_id") or "").strip()
             inst_code = (row.get("instrument_id") or "").strip()
@@ -792,9 +839,10 @@ class ImportService:
                     )
                 )
 
-        if not is_dry_run and to_create:
+        if not is_dry_run:
             with transaction.atomic():
-                Transaction.objects.bulk_create(to_create, batch_size=1000)
+                if to_create:
+                    Transaction.objects.bulk_create(to_create, batch_size=1000)
                 if row_errors:
                     ImportRowError.objects.bulk_create(row_errors, batch_size=1000)
 

@@ -91,6 +91,7 @@ THIRD_PARTY_APPS = [
     "drf_spectacular",
     "phonenumber_field",
     "django_filters",
+    "django_celery_results",
 ]
 CUSTOM_APPS = [
     "apps.common",
@@ -251,6 +252,18 @@ SPECTACULAR_SETTINGS = {
     "SERVE_PERMISSIONS": ["rest_framework.permissions.IsAdminUser"],
     "SCHEMA_PATH_PREFIX": "/api/v1/",
 }
+
+# Celery
+# ------------------------------------------------------------------------------
+REDIS_URL = env.str("REDIS_URL", default="redis://127.0.0.1:6379/0")
+CELERY_BROKER_URL = env.str("CELERY_BROKER_URL", default=REDIS_URL)
+CELERY_RESULT_BACKEND = "django-db"
+CELERY_TIMEZONE = TIME_ZONE
+CELERY_ACCEPT_CONTENT = ["json"]
+CELERY_TASK_SERIALIZER = "json"
+CELERY_RESULT_SERIALIZER = "json"
+CELERY_TASK_ALWAYS_EAGER = env.bool("CELERY_TASK_ALWAYS_EAGER", default=False)
+CELERY_TASK_EAGER_PROPAGATES = True
 
 # SuperAdmin Credentials
 # ------------------------------------------------------------------------------

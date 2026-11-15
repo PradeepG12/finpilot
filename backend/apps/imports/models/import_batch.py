@@ -47,6 +47,7 @@ class ImportBatch(AbstractBaseCMModel):
     status = CharField(max_length=30, choices=ImportStatusChoices.choices, default=ImportStatusChoices.processing)
     is_dry_run = BooleanField(default=False)
     rows_total = IntegerField(default=0)
+    rows_processed = IntegerField(default=0)
     rows_imported = IntegerField(default=0)
     rows_skipped_duplicate = IntegerField(default=0)
     rows_rejected = IntegerField(default=0)

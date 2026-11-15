@@ -35,6 +35,7 @@ class AdminImportTransactionsAPIView(AppAPIView):
             )
 
         dry_run = str(request.data.get("dry_run", "false")).lower() in ["true", "1"]
+        is_async = str(request.data.get("async", "true")).lower() in ["true", "1"]
         service = ImportService(user=request.user)
 
         result = service.import_file(
@@ -42,6 +43,7 @@ class AdminImportTransactionsAPIView(AppAPIView):
             file_obj=file_obj,
             file_name=file_obj.name,
             is_dry_run=dry_run,
+            is_async=is_async,
         )
 
         if result.get("conflict"):
@@ -61,6 +63,7 @@ class AdminImportTransactionsAPIView(AppAPIView):
             "status": batch.status,
             "counts": {
                 "total": batch.rows_total,
+                "processed": batch.rows_processed,
                 "imported": batch.rows_imported,
                 "skipped_duplicate": batch.rows_skipped_duplicate,
                 "rejected": batch.rows_rejected,
@@ -94,7 +97,20 @@ class AdminImportDetailAPIView(AppAPIView):
             raise NotFound(detail=f"Import batch '{uuid}' not found.")
 
         serializer = ImportBatchSerializer(batch)
-        return self.send_response(serializer.data)
+        data = dict(serializer.data)
+        
+        # Include top rejected rows directly in detail response for inline rendering
+        rejected_qs = ImportRowError.objects.filter(batch=batch).order_by("row_number")[:200]
+        data["rejected_rows"] = [
+            {
+                "row": err.row_number,
+                "code": err.error_code,
+                "field": err.field,
+                "message": err.message,
+            }
+            for err in rejected_qs
+        ]
+        return self.send_response(data)
 
 
 class AdminImportRejectedRowsAPIView(AppAPIView):

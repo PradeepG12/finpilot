@@ -40,6 +40,7 @@ class ImportBatchSerializer(serializers.ModelSerializer):
     def get_counts(self, obj):
         return {
             "total": obj.rows_total,
+            "processed": obj.rows_processed,
             "imported": obj.rows_imported,
             "skipped_duplicate": obj.rows_skipped_duplicate,
             "rejected": obj.rows_rejected,

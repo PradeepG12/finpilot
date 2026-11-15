@@ -3,7 +3,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { apiClient } from '@/lib/api';
 import { ApiResponse, GoalItem } from '@/types/api';
 import { formatINR, formatDate, formatPercent } from '@/lib/format';
-import { Plus, Target, CheckCircle2, AlertTriangle, AlertCircle } from 'lucide-react';
+import { Plus, CheckCircle2, AlertTriangle, AlertCircle } from 'lucide-react';
 
 interface Props {
   customerCode: string;
