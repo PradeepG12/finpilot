@@ -13,7 +13,14 @@ class CustomerTransactionsAPIViewSet(AppModelListAPIViewSet):
 
     serializer_class = TransactionListSerializer
     filterset_fields = ["transaction_type", "status"]
-    ordering_fields = ["trade_date", "amount", "id"]
+    ordering_fields = [
+        "trade_date",
+        "quantity",
+        "price",
+        "amount",
+        "transaction_code",
+        "id",
+    ]
 
     def get_queryset(self):
         customer_code = self.kwargs.get("customer_code")
@@ -42,7 +49,11 @@ class CustomerTransactionsAPIViewSet(AppModelListAPIViewSet):
         if date_to:
             qs = qs.filter(trade_date__lte=date_to)
         if account_code:
-            qs = qs.filter(account__account_code=account_code)
+            acc_list = [a.strip() for a in account_code.split(",") if a.strip()]
+            if len(acc_list) == 1:
+                qs = qs.filter(account__account_code=acc_list[0])
+            elif len(acc_list) > 1:
+                qs = qs.filter(account__account_code__in=acc_list)
         if instrument_code:
             qs = qs.filter(instrument__instrument_code=instrument_code)
 

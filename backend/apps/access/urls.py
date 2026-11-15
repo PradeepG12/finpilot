@@ -3,6 +3,7 @@
 from django.urls import path
 
 from apps.access.views.admin_user import (
+    AdminUserDetailAPIView,
     AdminUserListAPIViewSet,
     AdminUserStatusAPIView,
 )
@@ -23,6 +24,19 @@ urlpatterns = [
     path("auth/change-password/", ChangePasswordAPIView.as_view(), name="auth-change-password"),
 
     # Admin User Management endpoints
-    path("admin/users/", AdminUserListAPIViewSet.as_view({"get": "list"}), name="admin-user-list"),
-    path("admin/users/<uuid:uuid>/status/", AdminUserStatusAPIView.as_view(), name="admin-user-status"),
+    path(
+        "admin/users/",
+        AdminUserListAPIViewSet.as_view({"get": "list", "post": "create"}),
+        name="admin-user-list",
+    ),
+    path(
+        "admin/users/<uuid:uuid>/",
+        AdminUserDetailAPIView.as_view(),
+        name="admin-user-detail",
+    ),
+    path(
+        "admin/users/<uuid:uuid>/status/",
+        AdminUserStatusAPIView.as_view(),
+        name="admin-user-status",
+    ),
 ]

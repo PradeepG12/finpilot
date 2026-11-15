@@ -1,9 +1,9 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { apiClient } from '@/lib/api';
 import { ApiResponse, GoalItem } from '@/types/api';
 import { formatINR, formatDate, formatPercent } from '@/lib/format';
-import { Plus, CheckCircle2, AlertTriangle, AlertCircle } from 'lucide-react';
+import { Plus, CheckCircle2, AlertCircle, AlertTriangle, Search, X } from 'lucide-react';
 
 interface Props {
   customerCode: string;
@@ -14,6 +14,10 @@ export const CustomerGoalsTab: React.FC<Props> = ({ customerCode }) => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingGoal, setEditingGoal] = useState<GoalItem | null>(null);
 
+  // Search & Priority Filter states
+  const [searchTerm, setSearchTerm] = useState('');
+  const [priorityFilter, setPriorityFilter] = useState('');
+
   const [goalName, setGoalName] = useState('');
   const [goalType, setGoalType] = useState('RETIREMENT');
   const [targetAmount, setTargetAmount] = useState('');
@@ -23,12 +27,36 @@ export const CustomerGoalsTab: React.FC<Props> = ({ customerCode }) => {
   const [formError, setFormError] = useState<string | null>(null);
 
   const { data: goals, isLoading } = useQuery({
-    queryKey: ['goals', customerCode],
+    queryKey: ['goals', customerCode, { priority: priorityFilter, search: searchTerm }],
     queryFn: async () => {
-      const res = await apiClient.get<ApiResponse<GoalItem[]>>(`/customers/${customerCode}/goals/`);
+      const params = new URLSearchParams();
+      if (priorityFilter) params.append('priority', priorityFilter);
+      if (searchTerm) params.append('search', searchTerm);
+      const queryString = params.toString() ? `?${params.toString()}` : '';
+      const res = await apiClient.get<ApiResponse<GoalItem[]>>(`/customers/${customerCode}/goals/${queryString}`);
       return res.data.data;
     },
   });
+
+  // Client-side filtering fallback for instant response
+  const filteredGoals = useMemo(() => {
+    if (!goals) return [];
+    let list = [...goals];
+    if (searchTerm.trim()) {
+      const q = searchTerm.trim().toLowerCase();
+      list = list.filter(
+        (g) =>
+          g.goal_name.toLowerCase().includes(q) ||
+          g.goal_code.toLowerCase().includes(q) ||
+          g.goal_type.toLowerCase().includes(q)
+      );
+    }
+    if (priorityFilter) {
+      list = list.filter((g) => g.priority === priorityFilter);
+    }
+    return list;
+  }, [goals, searchTerm, priorityFilter]);
+
 
   const saveGoalMutation = useMutation({
     mutationFn: async () => {
@@ -109,15 +137,79 @@ export const CustomerGoalsTab: React.FC<Props> = ({ customerCode }) => {
         </button>
       </div>
 
+      {/* Search & Single Priority Filter Bar */}
+      <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 bg-surface p-4 rounded-xl border border-border shadow-xs">
+        <div className="relative flex-1 max-w-md">
+          <Search className="absolute left-3 top-2.5 h-4 w-4 text-text-muted" />
+          <input
+            type="text"
+            placeholder="Search goals by name, code, type..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="w-full pl-9 pr-8 py-2 text-sm rounded-lg border border-slate-300 focus:outline-none focus:ring-1 focus:ring-primary bg-white text-text-main placeholder:text-text-muted"
+          />
+          {searchTerm && (
+            <button
+              onClick={() => setSearchTerm('')}
+              className="absolute right-2.5 top-2.5 text-text-muted hover:text-text-main"
+            >
+              <X className="h-4 w-4" />
+            </button>
+          )}
+        </div>
+
+        <div className="flex items-center gap-2 justify-end">
+          {/* Single Priority Dropdown Filter */}
+          <select
+            value={priorityFilter}
+            onChange={(e) => setPriorityFilter(e.target.value)}
+            className="text-xs rounded-lg border border-slate-300 px-3 py-2 bg-white text-text-main focus:outline-none focus:ring-1 focus:ring-primary shadow-xs font-medium"
+            title="Filter by Priority"
+          >
+            <option value="">All Priorities</option>
+            <option value="HIGH">High Priority</option>
+            <option value="MEDIUM">Medium Priority</option>
+            <option value="LOW">Low Priority</option>
+          </select>
+
+          {(searchTerm || priorityFilter) && (
+            <button
+              type="button"
+              onClick={() => {
+                setSearchTerm('');
+                setPriorityFilter('');
+              }}
+              className="text-xs text-text-muted hover:text-loss transition-colors font-medium"
+            >
+              Reset
+            </button>
+          )}
+        </div>
+      </div>
+
       {isLoading ? (
         <div className="text-sm text-text-muted p-4">Loading financial goals...</div>
       ) : goals?.length === 0 ? (
         <div className="rounded-xl border border-border bg-surface p-8 text-center text-text-muted text-sm">
           No goals recorded for this customer yet. Click "Add Goal" to create one.
         </div>
+      ) : filteredGoals.length === 0 ? (
+        <div className="rounded-xl border border-border bg-surface p-8 text-center text-text-muted text-sm space-y-2">
+          <div>No goals match your search or priority filter.</div>
+          <button
+            type="button"
+            onClick={() => {
+              setSearchTerm('');
+              setPriorityFilter('');
+            }}
+            className="text-xs text-primary font-semibold hover:underline"
+          >
+            Reset Filters
+          </button>
+        </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {goals?.map((goal) => {
+          {filteredGoals.map((goal) => {
             const pct = parseFloat(goal.funded_percent);
             const isFunded = goal.flags.includes('FUNDED');
             const isOverdue = goal.flags.includes('OVERDUE');

@@ -9,15 +9,15 @@ from rest_framework.parsers import FormParser, MultiPartParser
 
 from apps.common.permissions import IsAdminRole
 from apps.common.views.base import AppAPIView
-from apps.common.views.generic import AppModelListAPIViewSet
+from apps.common.views.generic import AppModelListAPIViewSet, AppModelRetrieveAPIViewSet
 from apps.imports.config import ImportTypeChoices
 from apps.imports.models import ImportBatch, ImportRowError
 from apps.imports.serializers.imports import ImportBatchSerializer, ImportRowErrorSerializer
 from apps.imports.services.import_service import ImportService
 
 
-class AdminImportTransactionsAPIView(AppAPIView):
-    """Admin-only endpoint to upload and import transactions CSV."""
+class AdminImportUploadAPIView(AppAPIView):
+    """Admin-only endpoint to upload and import CSV data for any supported entity."""
 
     permission_classes = [IsAdminRole]
     parser_classes = [MultiPartParser, FormParser]
@@ -34,26 +34,36 @@ class AdminImportTransactionsAPIView(AppAPIView):
                 status_code=status.HTTP_415_UNSUPPORTED_MEDIA_TYPE,
             )
 
+        raw_type = request.data.get("import_type") or request.query_params.get("import_type") or "transactions"
+        type_str = str(raw_type).strip().upper()
+        if type_str in ["HOLDING", "HOLDINGS", "HOLDING_SNAPSHOT", "HOLDINGS_SNAPSHOT"]:
+            import_type = ImportTypeChoices.holdings
+        elif type_str in ["TRANSACTION", "TRANSACTIONS"]:
+            import_type = ImportTypeChoices.transactions
+        elif type_str in ["CUSTOMER", "CUSTOMERS"]:
+            import_type = ImportTypeChoices.customers
+        elif type_str in ["ACCOUNT", "ACCOUNTS"]:
+            import_type = ImportTypeChoices.accounts
+        elif type_str in ["INSTRUMENT", "INSTRUMENTS"]:
+            import_type = ImportTypeChoices.instruments
+        elif type_str in ["RISK_PROFILE", "RISK_PROFILES"]:
+            import_type = ImportTypeChoices.risk_profiles
+        elif type_str in ["GOAL", "GOALS"]:
+            import_type = ImportTypeChoices.goals
+        else:
+            import_type = ImportTypeChoices.transactions
+
         dry_run = str(request.data.get("dry_run", "false")).lower() in ["true", "1"]
         is_async = str(request.data.get("async", "true")).lower() in ["true", "1"]
         service = ImportService(user=request.user)
 
         result = service.import_file(
-            import_type=ImportTypeChoices.transactions,
+            import_type=import_type,
             file_obj=file_obj,
             file_name=file_obj.name,
             is_dry_run=dry_run,
             is_async=is_async,
         )
-
-        if result.get("conflict"):
-            return self.send_error_response(
-                {
-                    "detail": result["message"],
-                    "batch": str(result["batch"].uuid),
-                },
-                status_code=status.HTTP_409_CONFLICT,
-            )
 
         batch = result["batch"]
         response_data = {
@@ -75,71 +85,72 @@ class AdminImportTransactionsAPIView(AppAPIView):
         return self.send_response(response_data, status_code=status.HTTP_201_CREATED)
 
 
-class AdminImportHistoryAPIViewSet(AppModelListAPIViewSet):
-    """Admin-only listing of historical import batches."""
+AdminImportTransactionsAPIView = AdminImportUploadAPIView
+
+
+class AdminImportHistoryAPIViewSet(AppModelListAPIViewSet, AppModelRetrieveAPIViewSet):
+    """
+    Admin-only listing and detail of historical import batches.
+    Uses AppModelListAPIViewSet for automatic pagination and filtering.
+    """
 
     permission_classes = [IsAdminRole]
     serializer_class = ImportBatchSerializer
     queryset = ImportBatch.objects.all().order_by("-started_at")
     filterset_fields = ["import_type", "status", "is_dry_run"]
     ordering_fields = ["started_at", "rows_total", "rows_imported", "rows_rejected"]
+    lookup_field = "uuid"
+    lookup_url_kwarg = "uuid"
 
 
-class AdminImportDetailAPIView(AppAPIView):
-    """Admin-only detail view for a specific import batch."""
-
-    permission_classes = [IsAdminRole]
-
-    def get(self, request, uuid, *args, **kwargs):
-        try:
-            batch = ImportBatch.objects.get(uuid=uuid)
-        except ImportBatch.DoesNotExist:
-            raise NotFound(detail=f"Import batch '{uuid}' not found.")
-
-        serializer = ImportBatchSerializer(batch)
-        data = dict(serializer.data)
-        
-        # Include top 500 rejected rows directly in detail response with raw_row
-        rejected_qs = ImportRowError.objects.filter(batch=batch).order_by("row_number")[:500]
-        data["rejected_rows"] = [
-            {
-                "row": err.row_number,
-                "outcome": err.outcome,
-                "code": err.error_code,
-                "field": err.field,
-                "message": err.message,
-                "raw_row": err.raw_row,
-            }
-            for err in rejected_qs
-        ]
-        return self.send_response(data)
-
-
-class AdminImportRejectedRowsAPIView(AppAPIView):
-    """Admin-only list of rejected rows for a batch, supporting ?export=csv streaming."""
+class AdminImportRowResultsViewSet(AppModelListAPIViewSet):
+    """
+    Dedicated ADMIN-only ViewSet for import row results.
+    Inherits AppModelListAPIViewSet for built-in pagination, ordering, and filtering.
+    Registered via router for nested route: /admin/imports/{batch_uuid}/rows/
+    """
 
     permission_classes = [IsAdminRole]
+    serializer_class = ImportRowErrorSerializer
+    ordering_fields = ["row_number", "outcome", "error_code"]
 
-    def get(self, request, uuid, *args, **kwargs):
+    def get_queryset(self):
+        batch_uuid = self.kwargs.get("batch_uuid")
         try:
-            batch = ImportBatch.objects.get(uuid=uuid)
-        except ImportBatch.DoesNotExist:
-            raise NotFound(detail=f"Import batch '{uuid}' not found.")
+            batch = ImportBatch.objects.get(uuid=batch_uuid)
+        except (ImportBatch.DoesNotExist, ValueError):
+            raise NotFound(detail=f"Import batch '{batch_uuid}' not found.")
 
         qs = ImportRowError.objects.filter(batch=batch).order_by("row_number")
 
-        error_code = request.query_params.get("code")
-        if error_code:
-            qs = qs.filter(error_code=error_code)
+        outcome = self.request.query_params.get("outcome")
+        if not outcome:
+            outcome = "REJECTED"
+        if outcome in {"REJECTED", "SKIPPED_DUPLICATE"}:
+            qs = qs.filter(outcome=outcome)
 
+        code = self.request.query_params.get("code")
+        if code:
+            qs = qs.filter(error_code=code)
+
+        field = self.request.query_params.get("field")
+        if field:
+            qs = qs.filter(field__icontains=field)
+
+        return qs
+
+    def list(self, request, *args, **kwargs):
+        # CSV Export handling
         if request.query_params.get("export") == "csv":
+            queryset = self.filter_queryset(self.get_queryset())
+            batch_uuid = self.kwargs.get("batch_uuid")
+            outcome = request.query_params.get("outcome", "REJECTED")
             response = HttpResponse(content_type="text/csv")
-            response["Content-Disposition"] = f'attachment; filename="batch_{uuid}_rejected_rows.csv"'
+            response["Content-Disposition"] = f'attachment; filename="batch_{batch_uuid}_{outcome.lower()}_rows.csv"'
             writer = csv.writer(response)
             writer.writerow(["row_number", "outcome", "error_code", "field", "message", "raw_row"])
-            for err in qs:
+            for err in queryset:
                 writer.writerow([err.row_number, err.outcome, err.error_code, err.field, err.message, err.raw_row])
             return response
 
-        serializer = ImportRowErrorSerializer(qs[:200], many=True)
-        return self.send_response(serializer.data)
+        return super().list(request, *args, **kwargs)

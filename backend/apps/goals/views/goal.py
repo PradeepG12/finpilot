@@ -1,8 +1,10 @@
 """Views for managing financial goals."""
 
 from django.db import connection, transaction
+from django.db.models import Q
 from rest_framework import status
 from rest_framework.exceptions import NotFound
+
 
 from apps.common.views.base import AppAPIView
 from apps.customers.models import Customer
@@ -20,6 +22,19 @@ class CustomerGoalsAPIView(AppAPIView):
             raise NotFound(detail=f"Customer '{customer_code}' not found.")
 
         goals = Goal.objects.filter(customer=customer).order_by("target_date")
+
+        priority = request.query_params.get("priority")
+        if priority:
+            goals = goals.filter(priority=priority.upper())
+
+        search = request.query_params.get("search")
+        if search:
+            goals = goals.filter(
+                Q(goal_name__icontains=search)
+                | Q(goal_code__icontains=search)
+                | Q(goal_type__icontains=search)
+            )
+
         serializer = GoalSerializer(goals, many=True)
         return self.send_response(serializer.data)
 

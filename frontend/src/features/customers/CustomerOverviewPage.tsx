@@ -1,20 +1,65 @@
-import React, { useState } from 'react';
-import { useParams, Link } from 'react-router-dom';
+import React from 'react';
+import { useParams, Link, useSearchParams } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { apiClient } from '@/lib/api';
 import { ApiResponse, CustomerDetail, PortfolioResponse } from '@/types/api';
 import { DataFreshnessBanner } from '@/components/layout/DataFreshnessBanner';
 import { formatINR, formatPercent } from '@/lib/format';
-import { ArrowLeft, ArrowUpRight, ArrowDownRight, Layers, ShieldCheck } from 'lucide-react';
+import { ArrowLeft, ArrowUpRight, ArrowDownRight, Layers, ShieldCheck, ChevronRight } from 'lucide-react';
 import { CustomerPortfolioTab } from '@/features/portfolio/CustomerPortfolioTab';
 import { CustomerTransactionsTab } from '@/features/transactions/CustomerTransactionsTab';
 import { CustomerGoalsTab } from '@/features/goals/CustomerGoalsTab';
 
 export const CustomerOverviewPage: React.FC = () => {
   const { customerCode } = useParams<{ customerCode: string }>();
-  const [activeTab, setActiveTab] = useState<'overview' | 'portfolio' | 'transactions' | 'goals'>('overview');
+  const [searchParams, setSearchParams] = useSearchParams();
 
-  const { data: customer } = useQuery({
+  // Read URL query parameters on initial load & updates
+  const urlTab = searchParams.get('tab');
+  const urlAccount = searchParams.get('account') || '';
+
+  const activeTab: 'overview' | 'portfolio' | 'transactions' | 'goals' =
+    urlTab && ['overview', 'portfolio', 'transactions', 'goals'].includes(urlTab)
+      ? (urlTab as 'overview' | 'portfolio' | 'transactions' | 'goals')
+      : 'overview';
+
+  const handleTabChange = (newTab: 'overview' | 'portfolio' | 'transactions' | 'goals') => {
+    const newParams = new URLSearchParams(searchParams);
+    newParams.set('tab', newTab);
+    if (newTab !== 'portfolio') {
+      newParams.delete('account');
+    }
+    setSearchParams(newParams);
+  };
+
+  const handleSelectPortfolioAccount = (accountCode: string) => {
+    const newParams = new URLSearchParams(searchParams);
+    newParams.set('tab', 'portfolio');
+    if (accountCode) {
+      newParams.set('account', accountCode);
+    } else {
+      newParams.delete('account');
+    }
+    setSearchParams(newParams);
+  };
+
+  const handleNavigateToAccountPortfolio = (accountCode: string) => {
+    const newParams = new URLSearchParams(searchParams);
+    newParams.set('tab', 'portfolio');
+    newParams.set('account', accountCode);
+    setSearchParams(newParams);
+
+    setTimeout(() => {
+      const el = document.getElementById(`account-card-${accountCode}`);
+      if (el) {
+        el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        el.classList.add('ring-2', 'ring-primary', 'shadow-md');
+        setTimeout(() => el.classList.remove('ring-2', 'ring-primary', 'shadow-md'), 2500);
+      }
+    }, 100);
+  };
+
+  const { data: customer, isLoading: isLoadingCustomer, isError: isCustomerError } = useQuery({
     queryKey: ['customer', customerCode],
     queryFn: async () => {
       const res = await apiClient.get<ApiResponse<CustomerDetail>>(`/customers/${customerCode}/`);
@@ -34,7 +79,17 @@ export const CustomerOverviewPage: React.FC = () => {
     enabled: !!customerCode,
   });
 
-  if (!customer) {
+  if (isLoadingCustomer || !customer) {
+    if (isCustomerError) {
+      return (
+        <div className="p-8 text-center space-y-3">
+          <p className="text-sm font-semibold text-loss">Customer record not found or failed to load.</p>
+          <Link to="/customers" className="text-xs text-primary hover:underline font-medium">
+            ← Back to Customer List
+          </Link>
+        </div>
+      );
+    }
     return <div className="text-text-muted animate-pulse p-4">Loading customer record...</div>;
   }
 
@@ -159,7 +214,7 @@ export const CustomerOverviewPage: React.FC = () => {
           {(['overview', 'portfolio', 'transactions', 'goals'] as const).map((tab) => (
             <button
               key={tab}
-              onClick={() => setActiveTab(tab)}
+              onClick={() => handleTabChange(tab)}
               className={`py-4 px-1 text-sm font-medium border-b-2 capitalize transition-colors ${
                 activeTab === tab
                   ? 'border-primary text-primary font-semibold'
@@ -178,16 +233,30 @@ export const CustomerOverviewPage: React.FC = () => {
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             {/* Account Summaries */}
             <div className="rounded-xl border border-border bg-surface p-5 shadow-sm space-y-4">
-              <h3 className="font-semibold text-text-main text-base">Account Holdings Overview</h3>
+              <div className="flex items-center justify-between">
+                <h3 className="font-semibold text-text-main text-base">Account Holdings Overview</h3>
+                <span className="text-xs text-text-muted">Click an account to inspect portfolio</span>
+              </div>
               <div className="space-y-3">
                 {portfolio?.accounts.map((acc) => (
                   <div
                     key={acc.account_code}
-                    className="p-3.5 rounded-lg border border-border bg-slate-50 dark:bg-slate-800/40 flex justify-between items-center"
+                    role="button"
+                    tabIndex={0}
+                    onClick={() => handleNavigateToAccountPortfolio(acc.account_code)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' || e.key === ' ') {
+                        e.preventDefault();
+                        handleNavigateToAccountPortfolio(acc.account_code);
+                      }
+                    }}
+                    className="p-3.5 rounded-lg border border-border bg-slate-50 dark:bg-slate-800/40 flex justify-between items-center cursor-pointer hover:border-primary/60 hover:bg-slate-100/70 hover:shadow-xs transition-all group"
+                    title={`View ${acc.account_code} in Portfolio`}
                   >
                     <div>
-                      <div className="font-semibold text-text-main text-sm">
-                        {acc.account_code} — {acc.provider || acc.account_type}
+                      <div className="font-semibold text-text-main text-sm group-hover:text-primary transition-colors flex items-center gap-1.5">
+                        <span>{acc.account_code} — {acc.provider || acc.account_type}</span>
+                        <ChevronRight className="h-4 w-4 text-text-muted group-hover:text-primary group-hover:translate-x-0.5 transition-all" />
                       </div>
                       <div className="text-xs text-text-muted mt-0.5">
                         Status: {acc.status} · {acc.positions.length} position(s)
@@ -235,9 +304,30 @@ export const CustomerOverviewPage: React.FC = () => {
         </div>
       )}
 
-      {activeTab === 'portfolio' && <CustomerPortfolioTab portfolio={portfolio} />}
-      {activeTab === 'transactions' && <CustomerTransactionsTab customerCode={customer.customer_code} />}
+      {activeTab === 'portfolio' && (
+        <CustomerPortfolioTab
+          portfolio={portfolio}
+          customerCode={customer.customer_code}
+          targetAccount={urlAccount}
+          selectedAccount={urlAccount}
+          onSelectAccount={handleSelectPortfolioAccount}
+          onViewTransactions={(accCode) => {
+            const newParams = new URLSearchParams(searchParams);
+            newParams.set('tab', 'transactions');
+            newParams.set('account', accCode);
+            setSearchParams(newParams);
+          }}
+        />
+      )}
+      {activeTab === 'transactions' && (
+        <CustomerTransactionsTab
+          customerCode={customer.customer_code}
+          accounts={portfolio?.accounts}
+          initialAccount={urlAccount}
+        />
+      )}
       {activeTab === 'goals' && <CustomerGoalsTab customerCode={customer.customer_code} />}
+
     </div>
   );
 };

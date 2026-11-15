@@ -1,3 +1,4 @@
+from apps.reports.models.export_report import ExportReport
 from apps.reports.models.reports import (
     AccountTotal,
     CustomerAssetAllocation,
@@ -7,6 +8,7 @@ from apps.reports.models.reports import (
 )
 
 __all__ = [
+    "ExportReport",
     "AccountTotal",
     "CustomerAssetAllocation",
     "CustomerAUM",

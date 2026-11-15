@@ -7,6 +7,8 @@ import { LoginPage } from '@/features/auth/LoginPage';
 import { AppShell } from '@/components/layout/AppShell';
 import { CustomerListPage } from '@/features/customers/CustomerListPage';
 import { CustomerOverviewPage } from '@/features/customers/CustomerOverviewPage';
+import { AccountsListPage } from '@/features/accounts/AccountsListPage';
+import { ExportCenterPage } from '@/features/exports/ExportCenterPage';
 import { ImportPage } from '@/features/imports/ImportPage';
 import { UserManagementPage } from '@/features/admin/UserManagementPage';
 
@@ -39,6 +41,8 @@ export const App: React.FC = () => {
               <Route index element={<Navigate to="/customers" replace />} />
               <Route path="customers" element={<CustomerListPage />} />
               <Route path="customers/:customerCode" element={<CustomerOverviewPage />} />
+              <Route path="accounts" element={<AccountsListPage />} />
+              <Route path="exports" element={<ExportCenterPage />} />
               <Route
                 path="admin/imports"
                 element={

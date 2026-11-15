@@ -68,16 +68,13 @@ class Command(BaseCommand):
             with open(file_path, "rb") as f:
                 result = service.import_file(import_type=import_type, file_obj=f, file_name=file_name)
 
-            if result.get("conflict"):
-                self.stdout.write(self.style.WARNING(f"  -> {result['message']}"))
-            else:
-                self.stdout.write(
-                    self.style.SUCCESS(
-                        f"  -> Total: {result['total']} | Imported: {result['imported']} | "
-                        f"Skipped: {result['skipped_duplicate']} | Rejected: {result['rejected']}"
-                    )
+            self.stdout.write(
+                self.style.SUCCESS(
+                    f"  -> Total: {result['total']} | Imported: {result['imported']} | "
+                    f"Skipped: {result['skipped_duplicate']} | Rejected: {result['rejected']}"
                 )
-                if result.get("warnings"):
-                    self.stdout.write(f"     Warnings: {result['warnings']}")
+            )
+            if result.get("warnings"):
+                self.stdout.write(f"     Warnings: {result['warnings']}")
 
         self.stdout.write(self.style.SUCCESS("All seed operations completed."))

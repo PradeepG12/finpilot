@@ -13,6 +13,10 @@ class RiskProfileSummarySerializer(serializers.ModelSerializer):
 
 class CustomerListSerializer(serializers.ModelSerializer):
     risk_level = serializers.CharField(read_only=True)
+    accounts_count = serializers.IntegerField(read_only=True)
+    unrealised_pl_pct = serializers.DecimalField(
+        max_digits=10, decimal_places=4, read_only=True, allow_null=True
+    )
 
     class Meta:
         model = Customer
@@ -30,6 +34,8 @@ class CustomerListSerializer(serializers.ModelSerializer):
             "kyc_status",
             "segment",
             "risk_level",
+            "accounts_count",
+            "unrealised_pl_pct",
         ]
 
 
@@ -59,7 +65,7 @@ class CustomerDetailSerializer(serializers.ModelSerializer):
         ]
 
     def get_risk_profile(self, obj):
-        latest = obj.risk_profiles.order_by("-assessed_at").first()
-        if latest:
-            return RiskProfileSummarySerializer(latest).data
-        return None
+        rp = obj.risk_profiles.order_by("-assessed_at").first()
+        if not rp:
+            return None
+        return RiskProfileSummarySerializer(rp).data

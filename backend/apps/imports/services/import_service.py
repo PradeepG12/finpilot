@@ -1,7 +1,7 @@
 """Unified CSV Import Pipeline for FinPilot.
 
 Treats data ingestion as a robust ETL pipeline:
-1. Intake: SHA-256 idempotency check, size, CSV format validation.
+1. Intake: SHA-256 audit fingerprint, size, CSV format validation.
 2. Batch tracking: ImportBatch created with status PROCESSING.
 3. Row-level validation using exact rules from section 9 of the build plan.
 4. Set-based / atomic merge: inserts valid records, captures rejected and duplicate rows.
@@ -48,22 +48,10 @@ class ImportService:
 
         file_sha256 = hashlib.sha256(content_bytes).hexdigest()
 
-        # Idempotency check: if non-dry-run and hash exists in completed batches
-        if not is_dry_run:
-            existing_batch = ImportBatch.objects.filter(
-                import_type=import_type,
-                file_sha256=file_sha256,
-                is_dry_run=False,
-                status__in=[ImportStatusChoices.completed, ImportStatusChoices.completed_with_errors],
-            ).first()
-            if existing_batch:
-                return {
-                    "conflict": True,
-                    "batch": existing_batch,
-                    "message": f"File with identical content already imported (Batch {existing_batch.uuid})",
-                }
-
-        # Create batch record with initial rows_total estimate
+        # Retain the hash for auditability, without making it unique. A source
+        # extract may be re-uploaded after corrections or partial updates;
+        # row-level duplicate handling continues to protect final records.
+        # Create batch record with initial rows_total estimate.
         total_lines = max(0, len([l for l in content_str.splitlines() if l.strip()]) - 1)
         batch = ImportBatch.objects.create(
             import_type=import_type,
@@ -185,6 +173,12 @@ class ImportService:
 
             if code in seen_codes:
                 skipped += 1
+                row_errors.append(
+                    ImportRowError(
+                        batch=batch, row_number=row_idx, outcome=ImportOutcomeChoices.skipped_duplicate,
+                        error_code="ALREADY_IMPORTED", message=f"Instrument {code} already exists", raw_row=row,
+                    )
+                )
                 continue
 
             try:
@@ -266,6 +260,12 @@ class ImportService:
 
             if code in seen_codes:
                 skipped += 1
+                row_errors.append(
+                    ImportRowError(
+                        batch=batch, row_number=row_idx, outcome=ImportOutcomeChoices.skipped_duplicate,
+                        error_code="ALREADY_IMPORTED", message=f"Customer {code} already exists", raw_row=row,
+                    )
+                )
                 continue
 
             seen_codes.add(code)
@@ -347,6 +347,12 @@ class ImportService:
 
             if (cust_id, assessed_at) in existing_keys:
                 skipped += 1
+                row_errors.append(
+                    ImportRowError(
+                        batch=batch, row_number=row_idx, outcome=ImportOutcomeChoices.skipped_duplicate,
+                        error_code="ALREADY_IMPORTED", message=f"Risk profile for {cust_code} on {assessed_at} already exists", raw_row=row,
+                    )
+                )
                 continue
 
             existing_keys.add((cust_id, assessed_at))
@@ -411,6 +417,12 @@ class ImportService:
 
             if code in existing_codes:
                 skipped += 1
+                row_errors.append(
+                    ImportRowError(
+                        batch=batch, row_number=row_idx, outcome=ImportOutcomeChoices.skipped_duplicate,
+                        error_code="ALREADY_IMPORTED", message=f"Account {code} already exists", raw_row=row,
+                    )
+                )
                 continue
 
             existing_codes.add(code)
@@ -477,6 +489,12 @@ class ImportService:
 
             if code in existing_codes:
                 skipped += 1
+                row_errors.append(
+                    ImportRowError(
+                        batch=batch, row_number=row_idx, outcome=ImportOutcomeChoices.skipped_duplicate,
+                        error_code="ALREADY_IMPORTED", message=f"Goal {code} already exists", raw_row=row,
+                    )
+                )
                 continue
 
             try:

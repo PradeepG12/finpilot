@@ -8,10 +8,7 @@ from django.db.models import (
     IntegerField,
     JSONField,
     SET_NULL,
-    Q,
 )
-from django.db.models.constraints import UniqueConstraint
-
 from apps.common.models import COMMON_BLANK_AND_NULLABLE_FIELD_CONFIG, AbstractBaseCMModel
 from apps.imports.config import ImportStatusChoices, ImportTypeChoices
 
@@ -22,7 +19,7 @@ class ImportBatch(AbstractBaseCMModel):
 
     ********************* Model Fields *********************
         PK          - id
-        Unique      - uuid, (import_type, file_sha256) for completed non-dry-run batches
+        Unique      - uuid
         FK          - triggered_by (SET_NULL), created_by, modified_by
         Char        - import_type, file_name, file_sha256, status
         Boolean     - is_dry_run
@@ -33,14 +30,6 @@ class ImportBatch(AbstractBaseCMModel):
 
     class Meta(AbstractBaseCMModel.Meta):
         default_related_name = "related_import_batches"
-        constraints = [
-            UniqueConstraint(
-                fields=["import_type", "file_sha256"],
-                condition=Q(is_dry_run=False) & Q(status__in=["COMPLETED", "COMPLETED_WITH_ERRORS"]),
-                name="uq_import_type_sha256_completed",
-            ),
-        ]
-
     import_type = CharField(max_length=30, choices=ImportTypeChoices.choices)
     file_name = CharField(max_length=255)
     file_sha256 = CharField(max_length=64)

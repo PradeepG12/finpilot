@@ -168,6 +168,11 @@ TEMPLATES = [
 STATIC_URL = "/static/"
 STATIC_ROOT = str(APPS_DIR / "staticfiles")
 
+# MEDIA FILES
+# ------------------------------------------------------------------------------
+MEDIA_URL = "/media/"
+MEDIA_ROOT = str(APPS_DIR / "media")
+
 # SECURITY
 # ------------------------------------------------------------------------------
 SESSION_COOKIE_HTTPONLY = True

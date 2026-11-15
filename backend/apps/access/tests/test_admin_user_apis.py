@@ -174,3 +174,166 @@ class AdminUserManagementAPITestCase(AppAPITestCase):
         # Let's verify active_admins count is 1
         active_admins = User.objects.filter(user_type=UserTypeChoices.admin, is_active=True).count()
         self.assertEqual(active_admins, 1)
+
+
+    # -------------------------------------------------------------------------
+    # 5. User Creation Tests
+    # -------------------------------------------------------------------------
+    def test_admin_can_create_viewer_user(self):
+        """Admin can successfully create a new viewer user."""
+        self.authenticate(self.admin)
+        payload = {
+            "full_name": "New Viewer",
+            "email": "new.viewer@finpilot.local",
+            "user_type": "VIEWER",
+            "password": "StrongPassword!123",
+        }
+        response = self.client.post(ADMIN_USERS_URL, payload, format="json")
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(response.data["data"]["email"], "new.viewer@finpilot.local")
+        self.assertEqual(response.data["data"]["user_type"], "VIEWER")
+        self.assertTrue(response.data["data"]["is_active"])
+        self.assertNotIn("password", response.data["data"])
+
+        # Verify password works for authentication
+        user = User.objects.get(email="new.viewer@finpilot.local")
+        self.assertTrue(user.check_password("StrongPassword!123"))
+
+    def test_admin_can_create_admin_user(self):
+        """Admin can successfully create a new admin user."""
+        self.authenticate(self.admin)
+        payload = {
+            "full_name": "New Admin",
+            "email": "new.admin@finpilot.local",
+            "user_type": "ADMIN",
+            "password": "StrongPassword!123",
+        }
+        response = self.client.post(ADMIN_USERS_URL, payload, format="json")
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(response.data["data"]["user_type"], "ADMIN")
+
+    def test_viewer_cannot_create_user(self):
+        """Viewer receives 403 Forbidden when attempting to create a user."""
+        self.authenticate(self.viewer)
+        payload = {
+            "full_name": "Attempt By Viewer",
+            "email": "attempt@finpilot.local",
+            "user_type": "VIEWER",
+            "password": "StrongPassword!123",
+        }
+        response = self.client.post(ADMIN_USERS_URL, payload, format="json")
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+
+    def test_create_user_rejects_duplicate_email(self):
+        """Creating a user with an already existing email returns validation error."""
+        self.authenticate(self.admin)
+        payload = {
+            "full_name": "Duplicate User",
+            "email": self.viewer.email,
+            "user_type": "VIEWER",
+            "password": "StrongPassword!123",
+        }
+        response = self.client.post(ADMIN_USERS_URL, payload, format="json")
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("email", response.data["data"])
+
+    def test_create_user_rejects_invalid_password(self):
+        """Creating a user with a short or weak password returns validation error."""
+        self.authenticate(self.admin)
+        payload = {
+            "full_name": "Weak Pass User",
+            "email": "weak@finpilot.local",
+            "user_type": "VIEWER",
+            "password": "123",  # Less than 8 characters
+        }
+        response = self.client.post(ADMIN_USERS_URL, payload, format="json")
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("password", response.data["data"])
+
+    # -------------------------------------------------------------------------
+    # 4. View and Edit (Retrieve & Update) Tests
+    # -------------------------------------------------------------------------
+    def test_admin_can_retrieve_user_detail(self):
+        """Admin can retrieve a single user's detail by UUID."""
+        self.authenticate(self.admin)
+        url = f"/api/v1/admin/users/{self.viewer.uuid}/"
+        response = self.client.get(url)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        data = response.data["data"]
+        self.assertEqual(data["email"], self.viewer.email)
+        self.assertEqual(data["full_name"], self.viewer.full_name)
+        self.assertEqual(data["user_type"], "VIEWER")
+
+    def test_viewer_cannot_retrieve_admin_user_detail(self):
+        """Viewer receives 403 when accessing admin user detail endpoint."""
+        self.authenticate(self.viewer)
+        url = f"/api/v1/admin/users/{self.admin.uuid}/"
+        response = self.client.get(url)
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+
+    def test_admin_can_update_user_details(self):
+        """Admin can update another user's name, email, and role."""
+        self.authenticate(self.admin)
+        url = f"/api/v1/admin/users/{self.viewer.uuid}/"
+        payload = {
+            "full_name": "Updated Viewer Name",
+            "email": "updated.viewer@finpilot.local",
+            "user_type": "ADMIN",
+        }
+        response = self.client.patch(url, payload, format="json")
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        data = response.data["data"]
+        self.assertEqual(data["full_name"], "Updated Viewer Name")
+        self.assertEqual(data["email"], "updated.viewer@finpilot.local")
+        self.assertEqual(data["user_type"], "ADMIN")
+
+        self.viewer.refresh_from_db()
+        self.assertEqual(self.viewer.full_name, "Updated Viewer Name")
+        self.assertEqual(self.viewer.email, "updated.viewer@finpilot.local")
+        self.assertEqual(self.viewer.user_type, UserTypeChoices.admin)
+
+    def test_update_user_rejects_duplicate_email(self):
+        """Updating email to an existing email returns 400 validation error."""
+        self.authenticate(self.admin)
+        url = f"/api/v1/admin/users/{self.viewer.uuid}/"
+        payload = {"email": self.second_admin.email}
+        response = self.client.patch(url, payload, format="json")
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("email", response.data["data"])
+
+    def test_admin_cannot_demote_only_active_admin_to_viewer(self):
+        """Cannot demote the final active admin to viewer."""
+        # Deactivate second admin first
+        self.second_admin.is_active = False
+        self.second_admin.save()
+
+        self.authenticate(self.admin)
+        url = f"/api/v1/admin/users/{self.admin.uuid}/"
+        payload = {"user_type": "VIEWER"}
+        response = self.client.patch(url, payload, format="json")
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("Cannot change the role of the only remaining active admin", response.data["data"]["detail"])
+
+    def test_admin_cannot_deactivate_self_via_detail_endpoint(self):
+        """Admin cannot deactivate own account via detail endpoint."""
+        self.authenticate(self.admin)
+        url = f"/api/v1/admin/users/{self.admin.uuid}/"
+        payload = {"is_active": False}
+        response = self.client.patch(url, payload, format="json")
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("You cannot deactivate your own admin account", response.data["data"]["detail"])
+
+    def test_viewer_cannot_edit_profile_via_auth_me(self):
+        """Viewer cannot edit profile details via /api/v1/auth/me/ (view only)."""
+        self.authenticate(self.viewer)
+        response = self.client.patch("/api/v1/auth/me/", {"full_name": "Hacked Name"}, format="json")
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+
+    def test_admin_can_edit_profile_via_auth_me(self):
+        """Admin with role edit permission can update their profile via /api/v1/auth/me/."""
+        self.authenticate(self.admin)
+        response = self.client.patch("/api/v1/auth/me/", {"full_name": "Updated Admin Self"}, format="json")
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data["data"]["full_name"], "Updated Admin Self")
+        self.admin.refresh_from_db()
+        self.assertEqual(self.admin.full_name, "Updated Admin Self")

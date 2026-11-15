@@ -1,17 +1,28 @@
+"""URL patterns for imports app."""
+
 from django.urls import path
 
+from apps.common.router import AppSimpleRouter
 from apps.imports.views import (
-    AdminImportDetailAPIView,
     AdminImportHistoryAPIViewSet,
-    AdminImportRejectedRowsAPIView,
+    AdminImportRowResultsViewSet,
     AdminImportTransactionsAPIView,
+    AdminImportUploadAPIView,
 )
 
-batch_list = AdminImportHistoryAPIViewSet.as_view({"get": "list"})
+router = AppSimpleRouter()
+router.register(
+    r"admin/imports/(?P<batch_uuid>[^/.]+)/rows",
+    AdminImportRowResultsViewSet,
+    basename="admin-import-rows",
+)
+router.register(
+    r"admin/imports",
+    AdminImportHistoryAPIViewSet,
+    basename="admin-import-history",
+)
 
 urlpatterns = [
-    path("admin/imports/transactions/", AdminImportTransactionsAPIView.as_view(), name="admin-import-transactions"),
-    path("admin/imports/", batch_list, name="admin-import-history"),
-    path("admin/imports/<uuid:uuid>/", AdminImportDetailAPIView.as_view(), name="admin-import-detail"),
-    path("admin/imports/<uuid:uuid>/rejected-rows/", AdminImportRejectedRowsAPIView.as_view(), name="admin-import-rejected-rows"),
-]
+    path("admin/imports/upload/", AdminImportUploadAPIView.as_view(), name="admin-import-upload"),
+    path("admin/imports/transactions/", AdminImportUploadAPIView.as_view(), name="admin-import-transactions"),
+] + router.urls

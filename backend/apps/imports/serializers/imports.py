@@ -2,11 +2,14 @@
 
 from rest_framework import serializers
 
+from apps.common.serializers import AppReadOnlyModelSerializer
 from apps.imports.models import ImportBatch, ImportRowError
 
 
-class ImportRowErrorSerializer(serializers.ModelSerializer):
-    class Meta:
+class ImportRowErrorSerializer(AppReadOnlyModelSerializer):
+    """Serializer for import row error results."""
+
+    class Meta(AppReadOnlyModelSerializer.Meta):
         model = ImportRowError
         fields = [
             "id",
@@ -19,10 +22,12 @@ class ImportRowErrorSerializer(serializers.ModelSerializer):
         ]
 
 
-class ImportBatchSerializer(serializers.ModelSerializer):
+class ImportBatchSerializer(AppReadOnlyModelSerializer):
+    """Serializer for import batch metadata."""
+
     counts = serializers.SerializerMethodField()
 
-    class Meta:
+    class Meta(AppReadOnlyModelSerializer.Meta):
         model = ImportBatch
         fields = [
             "id",

@@ -19,6 +19,9 @@ export interface User {
   full_name: string | null;
   user_type: 'ADMIN' | 'VIEWER';
   is_active?: boolean;
+  phone_number?: string | null;
+  last_login?: string | null;
+  created?: string;
 }
 
 export interface AdminUserListItem {
@@ -46,7 +49,15 @@ export interface Customer {
   kyc_status: 'VERIFIED' | 'PENDING' | 'REVIEW';
   segment: 'MASS' | 'AFFLUENT' | 'HNI';
   risk_level?: string | null;
+  accounts_count?: number;
+  unrealised_pl_pct?: string | null;
 }
+
+export interface CustomerLocations {
+  states: { code: string; name: string }[];
+  cities: { name: string; state: string }[];
+}
+
 
 export interface RiskProfile {
   id: number;
@@ -172,6 +183,16 @@ export interface ImportBatchResult {
   }>;
 }
 
+export interface ImportRowResult {
+  id?: number;
+  row_number: number;
+  outcome: 'REJECTED' | 'SKIPPED_DUPLICATE';
+  error_code: string;
+  field: string | null;
+  message: string;
+  raw_row: Record<string, any>;
+}
+
 export interface ImportBatchDetail {
   id: number;
   uuid: string;
@@ -198,3 +219,69 @@ export interface ImportBatchDetail {
     raw_row?: Record<string, any>;
   }>;
 }
+
+export interface AccountListItem {
+  id: number;
+  uuid: string;
+  account_code: string;
+  customer_code: string;
+  customer_name: string;
+  account_type: 'BROKERAGE' | 'MUTUAL_FUND' | 'RETIREMENT';
+  provider: string | null;
+  status: 'ACTIVE' | 'DORMANT' | 'CLOSED';
+  opened_at: string | null;
+  current_market_value: string | null;
+}
+
+export interface CustomerLookupItem {
+  customer_code: string;
+  full_name: string;
+  email: string;
+}
+
+export interface AccountLookupItem {
+  account_code: string;
+  customer_code: string;
+  customer_name?: string;
+  account_type: string;
+  provider: string | null;
+  status: string;
+}
+
+export type ExportType = 'transactions' | 'portfolio_positions' | 'goals' | 'customers' | 'accounts';
+export type ExportStatus = 'PENDING' | 'PROCESSING' | 'COMPLETED' | 'FAILED';
+
+export interface ExportReportItem {
+  uuid: string;
+  export_type: 'TRANSACTIONS' | 'PORTFOLIO_POSITIONS' | 'GOALS' | 'CUSTOMERS' | 'ACCOUNTS';
+  status: ExportStatus;
+  filters: Record<string, any>;
+  file_name: string;
+  row_count: number;
+  error_message?: string | null;
+  is_downloaded: boolean;
+  can_download: boolean;
+  started_at?: string | null;
+  completed_at?: string | null;
+  downloaded_at?: string | null;
+  created: string;
+  created_by_email?: string | null;
+}
+
+export interface ExportInitialFilters {
+  exportType?: ExportType;
+  customerCodes?: string[];
+  accountCodes?: string[];
+  dateFrom?: string;
+  dateTo?: string;
+  transactionType?: string;
+  status?: string;
+  assetClass?: string;
+  priority?: string;
+  snapshotDate?: string;
+  kycStatus?: string;
+  segment?: string;
+  accountType?: string;
+  provider?: string;
+}
+

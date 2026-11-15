@@ -19,5 +19,6 @@ def register_custom_tasks(sender, **kwargs):
 
     for _import_string in [
         "apps.imports.tasks.ProcessImportBatchTask",
+        "apps.reports.tasks.GenerateExportReportTask",
     ]:
         sender.register_task(import_string(_import_string)())
