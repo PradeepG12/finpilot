@@ -92,42 +92,59 @@ export const ImportPage: React.FC = () => {
   const filteredRows = filterCode === 'ALL'
     ? rejectedRows
     : rejectedRows.filter((r) => r.code === filterCode);
+  const warningEntries = Object.entries(activeBatchDetail?.warnings || {}).filter(([, count]) => count > 0);
+  const warningCount = warningEntries.reduce((total, [, count]) => total + count, 0);
+  const isSuccessful = activeBatchDetail?.status === 'COMPLETED' && activeBatchDetail.counts.rejected === 0;
+  const statusClass = isSuccessful
+    ? 'bg-green-100 text-gain ring-1 ring-inset ring-green-200'
+    : activeBatchDetail?.status === 'COMPLETED_WITH_ERRORS'
+      ? 'bg-amber-100 text-warning ring-1 ring-inset ring-amber-200'
+      : activeBatchDetail?.status === 'DRY_RUN' || isBatchProcessing
+        ? 'bg-blue-100 text-blue-800 ring-1 ring-inset ring-blue-200'
+        : 'bg-red-100 text-loss ring-1 ring-inset ring-red-200';
 
   // =========================================================================
   // FULL PAGE VIEW: Batch Details & Rejected Rows
   // =========================================================================
   if (activeBatchUuid) {
     return (
-      <div className="space-y-6">
+      <div className="mx-auto max-w-screen-2xl space-y-6">
         {/* Navigation Bar / Back button */}
-        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-surface p-4 rounded-xl border border-border shadow-sm">
-          <div className="flex items-center gap-3">
+        <div className="flex flex-col gap-4 rounded-xl border border-border bg-surface px-5 py-4 shadow-sm lg:flex-row lg:items-center lg:justify-between sm:px-6">
+          <div className="flex min-w-0 items-start gap-3 sm:items-center">
             <button
               onClick={() => {
                 setActiveBatchUuid(null);
                 setFilterCode('ALL');
               }}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-slate-300 bg-white text-sm font-semibold text-text-main hover:bg-slate-50 transition-colors shadow-xs"
+              className="inline-flex shrink-0 items-center gap-1.5 rounded-lg border border-border bg-surface px-3 py-2 text-sm font-semibold text-text-main transition-colors hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
             >
               <ArrowLeft className="h-4 w-4" />
               <span>Back to Batches</span>
             </button>
-            <div className="h-5 w-px bg-border hidden sm:block" />
-            <div>
-              <h1 className="text-xl font-bold tracking-tight text-text-main">
+            <div className="hidden h-9 w-px bg-border sm:block" />
+            <div className="min-w-0">
+              <div className="flex flex-wrap items-center gap-2">
+              <h1 className="truncate text-xl font-bold tracking-tight text-text-main">
                 Import Batch: {activeBatchDetail?.file_name || 'Loading...'}
               </h1>
+              {activeBatchDetail && (
+                <span className={`inline-flex shrink-0 rounded-full px-2.5 py-1 text-xs font-bold ${statusClass}`}>
+                  {activeBatchDetail.is_dry_run ? 'DRY RUN' : activeBatchDetail.status.replace(/_/g, ' ')}
+                </span>
+              )}
+              </div>
               <p className="text-xs font-mono text-text-muted mt-0.5">
                 UUID: {activeBatchUuid}
               </p>
             </div>
           </div>
 
-          <div className="flex items-center gap-2 w-full sm:w-auto justify-end">
+          <div className="flex w-full items-center lg:w-auto lg:justify-end">
             {activeBatchDetail && activeBatchDetail.counts.rejected > 0 && (
               <button
                 onClick={() => handleDownloadCsv(activeBatchUuid)}
-                className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-lg border border-slate-300 bg-white text-sm font-semibold text-text-main hover:bg-slate-50 transition-colors shadow-xs"
+                className="inline-flex w-full items-center justify-center gap-1.5 rounded-lg border border-border bg-surface px-3.5 py-2 text-sm font-semibold text-text-main transition-colors hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary lg:w-auto"
               >
                 <Download className="h-4 w-4" />
                 <span>Export Rejected Rows CSV</span>
@@ -163,28 +180,41 @@ export const ImportPage: React.FC = () => {
             )}
 
             {/* Counts Overview Cards */}
-            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-              <div className="p-5 rounded-xl bg-surface border border-border shadow-xs text-center">
+            <section aria-label="Import result summary" className="rounded-xl border border-border bg-surface p-1 shadow-sm">
+              <div className="px-4 pt-4 sm:px-5">
+                <h2 className="text-base font-bold text-text-main">Import result</h2>
+                <p className="mt-0.5 text-xs text-text-muted">
+                  {isBatchProcessing ? 'Counts refresh automatically while the file is being processed.' : activeBatchDetail.counts.rejected > 0 ? 'Review and export the failed rows below to correct the source file.' : 'All rows were processed without validation failures.'}
+                </p>
+              </div>
+            <div className="mt-4 grid grid-cols-2 gap-px overflow-hidden rounded-lg bg-border lg:grid-cols-5">
+              <div className="bg-surface p-4 text-center sm:p-5">
                 <div className="text-xs font-semibold text-text-muted uppercase tracking-wide">Total Rows</div>
                 <div className="text-3xl font-extrabold text-text-main mt-2">{activeBatchDetail.counts.total.toLocaleString()}</div>
                 <div className="text-xs text-text-muted mt-1">In uploaded CSV</div>
               </div>
-              <div className="p-5 rounded-xl bg-green-50/60 border border-green-200 shadow-xs text-center text-gain">
+              <div className="bg-green-50/60 p-4 text-center text-gain sm:p-5">
                 <div className="text-xs font-semibold uppercase tracking-wide">Imported</div>
                 <div className="text-3xl font-extrabold mt-2">{activeBatchDetail.counts.imported.toLocaleString()}</div>
                 <div className="text-xs text-green-700 mt-1">Successfully stored</div>
               </div>
-              <div className="p-5 rounded-xl bg-amber-50/60 border border-amber-200 shadow-xs text-center text-warning">
+              <div className="bg-amber-50/60 p-4 text-center text-warning sm:p-5">
                 <div className="text-xs font-semibold uppercase tracking-wide">Skipped Duplicates</div>
                 <div className="text-3xl font-extrabold mt-2">{activeBatchDetail.counts.skipped_duplicate.toLocaleString()}</div>
                 <div className="text-xs text-amber-700 mt-1">Duplicate keys ignored</div>
               </div>
-              <div className="p-5 rounded-xl bg-red-50/60 border border-red-200 shadow-xs text-center text-loss">
+              <div className="bg-red-50/60 p-4 text-center text-loss sm:p-5">
                 <div className="text-xs font-semibold uppercase tracking-wide">Rejected</div>
                 <div className="text-3xl font-extrabold mt-2">{activeBatchDetail.counts.rejected.toLocaleString()}</div>
                 <div className="text-xs text-red-700 mt-1">Validation errors</div>
               </div>
+              <div className="col-span-2 bg-amber-50/60 p-4 text-center text-warning sm:p-5 lg:col-span-1">
+                <div className="text-xs font-semibold uppercase tracking-wide">Warnings</div>
+                <div className="mt-2 text-3xl font-extrabold">{warningCount.toLocaleString()}</div>
+                <div className="mt-1 text-xs text-amber-700">Imported with notices</div>
+              </div>
             </div>
+            </section>
 
             {/* Batch Metadata Card */}
             <div className="rounded-xl border border-border bg-surface p-5 shadow-xs grid grid-cols-2 sm:grid-cols-4 gap-4 text-sm">
@@ -194,18 +224,8 @@ export const ImportPage: React.FC = () => {
               </div>
               <div>
                 <span className="text-xs font-medium text-text-muted block">Status</span>
-                <span
-                  className={`inline-block text-xs px-2.5 py-0.5 rounded-full font-bold mt-0.5 ${
-                    activeBatchDetail.status === 'COMPLETED'
-                      ? 'bg-green-100 text-gain'
-                      : activeBatchDetail.status === 'COMPLETED_WITH_ERRORS'
-                      ? 'bg-amber-100 text-warning'
-                      : activeBatchDetail.status === 'DRY_RUN'
-                      ? 'bg-blue-100 text-blue-800'
-                      : 'bg-red-100 text-loss'
-                  }`}
-                >
-                  {activeBatchDetail.is_dry_run ? 'DRY_RUN' : activeBatchDetail.status}
+                <span className={`inline-block text-xs px-2.5 py-0.5 rounded-full font-bold mt-0.5 ${statusClass}`}>
+                  {activeBatchDetail.is_dry_run ? 'DRY RUN' : activeBatchDetail.status.replace(/_/g, ' ')}
                 </span>
               </div>
               <div>
@@ -221,14 +241,14 @@ export const ImportPage: React.FC = () => {
             </div>
 
             {/* Warnings Breakdown */}
-            {activeBatchDetail.warnings && Object.keys(activeBatchDetail.warnings).length > 0 && (
+            {warningEntries.length > 0 && (
               <div className="rounded-xl border border-amber-200 bg-amber-50/40 p-5 space-y-2">
                 <h3 className="text-sm font-bold text-amber-900 flex items-center gap-2">
                   <AlertTriangle className="h-4 w-4 text-warning" />
                   Warnings Breakdown (Imported with Notices)
                 </h3>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
-                  {Object.entries(activeBatchDetail.warnings).map(([code, count]) => (
+                  {warningEntries.map(([code, count]) => (
                     <div key={code} className="flex justify-between items-center bg-white px-3 py-2 rounded-lg border border-amber-200 text-xs">
                       <span className="font-mono text-text-main">{code}</span>
                       <span className="font-bold text-amber-800">{count} rows</span>
@@ -239,10 +259,10 @@ export const ImportPage: React.FC = () => {
             )}
 
             {/* Rejected Rows Full Detail Section */}
-            <div className="rounded-xl border border-border bg-surface p-6 shadow-sm space-y-4">
+            <section aria-labelledby="rejected-rows-heading" className="rounded-xl border border-border bg-surface p-5 shadow-sm space-y-4 sm:p-6">
               <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 border-b border-border pb-4">
                 <div>
-                  <h2 className="text-base font-bold text-text-main">
+                  <h2 id="rejected-rows-heading" className="text-base font-bold text-text-main">
                     Rejected Rows & Validation Failures ({filteredRows.length} shown)
                   </h2>
                   <p className="text-xs text-text-muted">
@@ -276,9 +296,9 @@ export const ImportPage: React.FC = () => {
                   No rejected rows found for this batch.
                 </div>
               ) : (
-                <div className="overflow-x-auto rounded-lg border border-border">
+                <div className="max-h-[34rem] overflow-auto rounded-lg border border-border" aria-label="Rejected rows table">
                   <table className="min-w-full divide-y divide-border text-left text-xs">
-                    <thead className="bg-slate-50 text-text-muted uppercase font-semibold">
+                    <thead className="sticky top-0 z-10 bg-slate-50 text-text-muted uppercase font-semibold shadow-[0_1px_0_0_var(--border)]">
                       <tr>
                         <th className="px-3.5 py-3 w-16">Row #</th>
                         <th className="px-3.5 py-3 w-40">Error Code</th>
@@ -289,8 +309,8 @@ export const ImportPage: React.FC = () => {
                     </thead>
                     <tbody className="divide-y divide-border">
                       {filteredRows.map((row, idx) => (
-                        <tr key={idx} className="hover:bg-slate-50/70 transition-colors">
-                          <td className="px-3.5 py-2.5 font-mono font-bold text-text-main">{row.row}</td>
+                        <tr key={`${row.row}-${idx}`} className="group hover:bg-slate-50/70 transition-colors">
+                          <td className="sticky left-0 bg-surface px-3.5 py-2.5 font-mono font-bold text-text-main group-hover:bg-slate-50">{row.row}</td>
                           <td className="px-3.5 py-2.5">
                             <span className="font-semibold text-loss bg-red-50 border border-red-200 px-2 py-0.5 rounded text-2xs">
                               {row.code}
@@ -313,7 +333,7 @@ export const ImportPage: React.FC = () => {
                   </table>
                 </div>
               )}
-            </div>
+            </section>
           </div>
         ) : null}
       </div>

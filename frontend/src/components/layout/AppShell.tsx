@@ -13,9 +13,9 @@ export const AppShell: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen bg-bg flex flex-col md:flex-row">
-      {/* Sidebar for Desktop */}
-      <aside className="w-full md:w-64 bg-surface border-r border-border flex flex-col justify-between p-4">
+    <div className="h-screen w-screen bg-bg flex flex-col md:flex-row overflow-hidden">
+      {/* Sidebar for Desktop - Fixed Left Column */}
+      <aside className="w-full md:w-64 h-full bg-surface border-r border-border flex flex-col justify-between p-4 flex-shrink-0 z-20 overflow-y-auto">
         <div>
           <div className="flex items-center space-x-2 px-2 py-4 border-b border-border mb-6">
             <Shield className="h-6 w-6 text-primary" />
@@ -72,8 +72,8 @@ export const AppShell: React.FC = () => {
         </div>
       </aside>
 
-      {/* Main Content Area */}
-      <main className="flex-1 overflow-y-auto p-4 sm:p-6 lg:p-8">
+      {/* Main Content Area - Scrollable Right Part */}
+      <main className="flex-1 h-full overflow-y-auto p-4 sm:p-6 lg:p-8">
         <Outlet />
       </main>
     </div>
