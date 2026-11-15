@@ -71,6 +71,39 @@ npm run dev                      # Vite on :5173
 
 ---
 
+## Deploy to Vercel and Render
+
+The backend (Django, Celery worker, PostgreSQL, Redis) runs on Render from `render.yaml`; `frontend/` runs on Vercel.
+
+### Render backend
+
+1. Push the repo to GitHub, then in Render choose **New > Blueprint** and select the repo.
+2. `render.yaml` creates `finpilot-db` (PostgreSQL), `finpilot-redis` (Redis) and `finpilot-api` (Docker web service built from `Dockerfile.render`).
+3. `Dockerfile.render` builds from the repo root so `data/seed/` is in the image. The container runs `init_app` (migrate + seed users), `seed_data_if_empty` when `AUTO_SEED=true`, a Celery worker (`-P solo`), then gunicorn. The worker shares the container with Django because async exports are written to local disk (`MEDIA_ROOT/exports`) and must be readable by the web process.
+4. Fill in the prompted values: `SUPER_ADMIN_EMAIL`, `SUPER_ADMIN_PASSWORD`, `DEMO_VIEWER_EMAIL`, `DEMO_VIEWER_PASSWORD`.
+5. After the Vercel URL is known, set and redeploy:
+
+```text
+DJANGO_ALLOWED_HOSTS=<render-service-hostname>
+DJANGO_CSRF_TRUSTED_ORIGINS=https://<your-app>.vercel.app
+CORS_ALLOWED_ORIGINS=https://<your-app>.vercel.app
+```
+
+Set `AUTO_SEED=false` after the first successful deploy. Keep `DJANGO_SECURE_SSL_REDIRECT=False`: Render terminates TLS and the settings do not trust the proxy header, so `True` causes a redirect loop.
+
+### Vercel frontend
+
+- Root directory: `frontend`
+- Build command: `npm run build`
+- Output directory: `dist`
+- `frontend/vercel.json` proxies `/api/*` to the Render service and provides the SPA rewrite. If the Render hostname is not `finpilot-api.onrender.com`, update the proxy destination.
+- Leave `VITE_API_BASE_URL` unset. The browser then calls `/api/v1` on the Vercel domain, so the refresh cookie is same-site and `COOKIE_SAMESITE=Lax` works.
+- To call Render directly instead, set `VITE_API_BASE_URL=https://<render-hostname>/api/v1`, use `COOKIE_SAMESITE=None` with `COOKIE_SECURE=True`, and expect third-party cookie blocking in some browsers.
+
+The Render free tier sleeps when idle (first request takes up to a minute) and its free PostgreSQL expires after a limited period.
+
+---
+
 ## Seed Data
 
 The seed command imports the 8 raw CSVs from `data/seed/` in FK-safe order:

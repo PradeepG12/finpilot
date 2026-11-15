@@ -1,0 +1,93 @@
+databases:
+  - name: finpilot-db
+    plan: free
+    databaseName: finpilot
+    user: finpilot
+
+services:
+  - type: keyvalue
+    name: finpilot-redis
+    plan: free
+    maxmemoryPolicy: noeviction
+    ipAllowList: [] # internal connections only
+
+  # Django (gunicorn) + Celery worker in one container: async exports write CSVs to local disk
+  - type: web
+    name: finpilot-api
+    runtime: docker
+    dockerfilePath: ./Dockerfile.render
+    dockerContext: .
+    plan: free
+    healthCheckPath: /api/v1/health/
+    envVars:
+      - key: REDIS_URL
+        fromService:
+          type: keyvalue
+          name: finpilot-redis
+          property: connectionString
+      - key: DJANGO_SETTINGS_MODULE
+        value: config.settings.deployment
+      - key: PROJECT_NAME
+        value: FinPilot
+      - key: ENVIRONMENT
+        value: production
+      - key: DJANGO_SECRET_KEY
+        generateValue: true
+      - key: JWT_SIGNING_SECRET_KEY
+        generateValue: true
+      # Set after the first deploy, then redeploy:
+      - key: DJANGO_ALLOWED_HOSTS
+        sync: false
+      - key: DJANGO_CSRF_TRUSTED_ORIGINS
+        sync: false
+      - key: CORS_ALLOWED_ORIGINS
+        sync: false
+      - key: CORS_ALLOW_CREDENTIALS
+        value: "True"
+      # Database (from finpilot-db)
+      - key: POSTGRES_HOST
+        fromDatabase:
+          name: finpilot-db
+          property: host
+      - key: POSTGRES_PORT
+        fromDatabase:
+          name: finpilot-db
+          property: port
+      - key: POSTGRES_DB
+        fromDatabase:
+          name: finpilot-db
+          property: database
+      - key: POSTGRES_USER
+        fromDatabase:
+          name: finpilot-db
+          property: user
+      - key: POSTGRES_PASSWORD
+        fromDatabase:
+          name: finpilot-db
+          property: password
+      # Cookies / security (Vercel proxies /api, so cookies are same-site)
+      - key: COOKIE_SECURE
+        value: "True"
+      - key: COOKIE_SAMESITE
+        value: Lax
+      - key: SESSION_COOKIE_SECURE
+        value: "True"
+      - key: CSRF_COOKIE_SECURE
+        value: "True"
+      - key: DJANGO_SECURE_SSL_REDIRECT
+        value: "False"
+      # Seed users (prompted in the dashboard)
+      - key: SUPER_ADMIN_EMAIL
+        sync: false
+      - key: SUPER_ADMIN_NAME
+        value: FinPilot Admin
+      - key: SUPER_ADMIN_PASSWORD
+        sync: false
+      - key: DEMO_VIEWER_EMAIL
+        sync: false
+      - key: DEMO_VIEWER_PASSWORD
+        sync: false
+      - key: AUTO_SEED
+        value: "true"
+      - key: BUSINESS_TIME_ZONE
+        value: Asia/Kolkata

@@ -2,10 +2,11 @@
 
 ## Architecture decisions
 
-### Celery/Redis omitted
-**Decision:** Synchronous CSV import; no Celery or Redis. LocMemCache is used for caching.
-**Reason:** The assignment CSV files contain ~5k rows. Synchronous import completes in <5 seconds — well under the gunicorn 60 s timeout. Fewer moving parts = fewer failure modes for a reviewer running from scratch.
-**Future path:** At larger scale (>50k rows, object storage, background jobs), move to: file upload -> S3/object storage -> Celery task -> result via WebSocket or polling. Documented in architecture report.
+### Celery/Redis for async exports only
+**Decision:** CSV import stays synchronous. Celery (Redis broker, `django-celery-results` backend) is used only for async report exports. LocMemCache is still used for caching.
+**Reason:** The assignment CSV files contain ~5k rows, so synchronous import completes in <5 seconds, well under the gunicorn 60 s timeout. Large exports are queued instead of held in a request.
+**Deployment:** On Render the Celery worker runs in the same container as gunicorn, because export files are written to local disk and the web process serves the download. Splitting them needs shared storage (e.g. S3 or object storage).
+**Future path:** At larger scale (>50k rows, object storage, background jobs), move to: file upload -> S3/object storage -> Celery task -> result via WebSocket or polling.
 
 ### JWT (simplejwt) replaces DRF Token Auth
 **Decision:** `djangorestframework-simplejwt` with token_blacklist.
