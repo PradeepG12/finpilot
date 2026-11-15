@@ -8,6 +8,7 @@ import { AppShell } from '@/components/layout/AppShell';
 import { CustomerListPage } from '@/features/customers/CustomerListPage';
 import { CustomerOverviewPage } from '@/features/customers/CustomerOverviewPage';
 import { ImportPage } from '@/features/imports/ImportPage';
+import { UserManagementPage } from '@/features/admin/UserManagementPage';
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -43,6 +44,14 @@ export const App: React.FC = () => {
                 element={
                   <RoleGate allowedRoles={['ADMIN']} fallback={<div className="p-8 text-center text-loss">Access Denied: Admins Only.</div>}>
                     <ImportPage />
+                  </RoleGate>
+                }
+              />
+              <Route
+                path="admin/users"
+                element={
+                  <RoleGate allowedRoles={['ADMIN']} fallback={<div className="p-8 text-center text-loss">Access Denied: Admins Only.</div>}>
+                    <UserManagementPage />
                   </RoleGate>
                 }
               />

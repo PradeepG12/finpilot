@@ -14,9 +14,22 @@ export interface PaginatedData<T> {
 
 export interface User {
   id: number;
+  uuid?: string;
   email: string;
   full_name: string | null;
   user_type: 'ADMIN' | 'VIEWER';
+  is_active?: boolean;
+}
+
+export interface AdminUserListItem {
+  id: number;
+  uuid: string;
+  email: string;
+  full_name: string | null;
+  user_type: 'ADMIN' | 'VIEWER';
+  is_active: boolean;
+  last_login: string | null;
+  created: string;
 }
 
 export interface Customer {

@@ -1,7 +1,7 @@
 import React from 'react';
 import { NavLink, Outlet, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/features/auth/AuthContext';
-import { Users, Upload, LogOut, Shield } from 'lucide-react';
+import { Users, Upload, LogOut, Shield, UserCog } from 'lucide-react';
 
 export const AppShell: React.FC = () => {
   const { user, logout } = useAuth();
@@ -38,19 +38,35 @@ export const AppShell: React.FC = () => {
             </NavLink>
 
             {user?.user_type === 'ADMIN' && (
-              <NavLink
-                to="/admin/imports"
-                className={({ isActive }) =>
-                  `flex items-center space-x-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors ${
-                    isActive
-                      ? 'bg-primary text-white'
-                      : 'text-text-muted hover:bg-slate-100 hover:text-text-main dark:hover:bg-slate-800'
-                  }`
-                }
-              >
-                <Upload className="h-5 w-5" />
-                <span>Admin Imports</span>
-              </NavLink>
+              <>
+                <NavLink
+                  to="/admin/imports"
+                  className={({ isActive }) =>
+                    `flex items-center space-x-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors ${
+                      isActive
+                        ? 'bg-primary text-white'
+                        : 'text-text-muted hover:bg-slate-100 hover:text-text-main dark:hover:bg-slate-800'
+                    }`
+                  }
+                >
+                  <Upload className="h-5 w-5" />
+                  <span>Admin Imports</span>
+                </NavLink>
+
+                <NavLink
+                  to="/admin/users"
+                  className={({ isActive }) =>
+                    `flex items-center space-x-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors ${
+                      isActive
+                        ? 'bg-primary text-white'
+                        : 'text-text-muted hover:bg-slate-100 hover:text-text-main dark:hover:bg-slate-800'
+                    }`
+                  }
+                >
+                  <UserCog className="h-5 w-5" />
+                  <span>User Management</span>
+                </NavLink>
+              </>
             )}
           </nav>
         </div>
