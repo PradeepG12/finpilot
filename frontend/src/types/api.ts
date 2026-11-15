@@ -151,9 +151,11 @@ export interface ImportBatchResult {
   warnings: Record<string, number>;
   rejected_rows?: Array<{
     row: number;
+    outcome?: string;
     code: string;
     field: string | null;
     message: string;
+    raw_row?: Record<string, any>;
   }>;
 }
 
@@ -176,8 +178,10 @@ export interface ImportBatchDetail {
   finished_at: string | null;
   rejected_rows?: Array<{
     row: number;
+    outcome?: string;
     code: string;
     field: string | null;
     message: string;
+    raw_row?: Record<string, any>;
   }>;
 }

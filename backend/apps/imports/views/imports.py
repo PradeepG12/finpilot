@@ -99,14 +99,16 @@ class AdminImportDetailAPIView(AppAPIView):
         serializer = ImportBatchSerializer(batch)
         data = dict(serializer.data)
         
-        # Include top rejected rows directly in detail response for inline rendering
-        rejected_qs = ImportRowError.objects.filter(batch=batch).order_by("row_number")[:200]
+        # Include top 500 rejected rows directly in detail response with raw_row
+        rejected_qs = ImportRowError.objects.filter(batch=batch).order_by("row_number")[:500]
         data["rejected_rows"] = [
             {
                 "row": err.row_number,
+                "outcome": err.outcome,
                 "code": err.error_code,
                 "field": err.field,
                 "message": err.message,
+                "raw_row": err.raw_row,
             }
             for err in rejected_qs
         ]
