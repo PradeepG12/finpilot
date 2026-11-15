@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { apiClient } from '@/lib/api';
 import { ApiResponse, ImportBatchResult, ImportBatchDetail, PaginatedData } from '@/types/api';
@@ -12,10 +12,12 @@ import {
   Filter,
   CheckCircle2,
   AlertTriangle,
+  X,
 } from 'lucide-react';
 
 export const ImportPage: React.FC = () => {
   const queryClient = useQueryClient();
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const [file, setFile] = useState<File | null>(null);
   const [dryRun, setDryRun] = useState(false);
   const [activeBatchUuid, setActiveBatchUuid] = useState<string | null>(null);
@@ -364,11 +366,45 @@ export const ImportPage: React.FC = () => {
 
         <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4">
           <input
+            ref={fileInputRef}
             type="file"
             accept=".csv"
             onChange={(e) => setFile(e.target.files?.[0] || null)}
-            className="text-sm text-text-muted file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-primary file:text-white hover:file:opacity-90 cursor-pointer"
+            className="hidden"
+            id="csv-file-input"
           />
+
+          {!file ? (
+            <label
+              htmlFor="csv-file-input"
+              className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-primary text-white text-sm font-semibold hover:opacity-90 cursor-pointer shadow-xs transition-opacity"
+            >
+              <Upload className="h-4 w-4" />
+              <span>Choose File</span>
+            </label>
+          ) : (
+            <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg border-2 border-primary/40 bg-blue-50/80 text-primary shadow-xs animate-in fade-in duration-150">
+              <FileText className="h-4 w-4 text-primary shrink-0" />
+              <span className="text-sm font-semibold text-text-main truncate max-w-[200px] sm:max-w-[280px]">
+                {file.name}
+              </span>
+              <span className="text-xs text-text-muted font-mono">
+                ({(file.size / 1024).toFixed(1)} KB)
+              </span>
+              <button
+                type="button"
+                onClick={() => {
+                  setFile(null);
+                  if (fileInputRef.current) fileInputRef.current.value = '';
+                }}
+                className="ml-1 p-1 rounded-md text-slate-400 hover:text-loss hover:bg-red-50 transition-colors"
+                title="Remove selected file"
+                aria-label="Remove selected file"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+          )}
 
           <label className="flex items-center space-x-2 text-sm text-text-main cursor-pointer select-none">
             <input
