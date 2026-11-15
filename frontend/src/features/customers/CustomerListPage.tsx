@@ -16,6 +16,30 @@ export const CustomerListPage: React.FC = () => {
 
   const [searchTerm, setSearchTerm] = useState(search);
 
+  // Sync state if URL search param changes
+  React.useEffect(() => {
+    setSearchTerm(search);
+  }, [search]);
+
+  // Debounced search on every keystroke
+  React.useEffect(() => {
+    const timer = setTimeout(() => {
+      const currentParam = searchParams.get('search') || '';
+      if (searchTerm !== currentParam) {
+        const newParams = new URLSearchParams(searchParams);
+        if (searchTerm) {
+          newParams.set('search', searchTerm);
+        } else {
+          newParams.delete('search');
+        }
+        newParams.set('page', '1');
+        setSearchParams(newParams);
+      }
+    }, 250);
+
+    return () => clearTimeout(timer);
+  }, [searchTerm, searchParams, setSearchParams]);
+
   const { data, isLoading, isError } = useQuery({
     queryKey: ['customers', { search, kyc, segment, page }],
     queryFn: async () => {
