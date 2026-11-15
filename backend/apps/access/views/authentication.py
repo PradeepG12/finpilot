@@ -3,6 +3,7 @@
 import logging
 
 from django.conf import settings
+from django.contrib.auth.models import update_last_login
 from rest_framework import status
 from rest_framework_simplejwt.exceptions import InvalidToken, TokenError
 from rest_framework_simplejwt.tokens import RefreshToken
@@ -46,6 +47,7 @@ class LoginAPIView(NonAuthenticatedAPIMixin, AppAPIView):
 
         serializer = self.get_valid_serializer(data=request.data)
         user = serializer.validated_data["user"]
+        update_last_login(None, user)
         refresh = RefreshToken.for_user(user)
         access = str(refresh.access_token)
         logger.info("user.login", extra={"user_id": user.id, "user_type": user.user_type})
