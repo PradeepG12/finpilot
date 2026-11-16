@@ -148,3 +148,28 @@ class ImportBatchAndRowsAPITestCase(AppAPITestCase):
 
         res_rows = self.client.get(f"/api/v1/admin/imports/{self.batch.uuid}/rows/")
         self.assertEqual(res_rows.status_code, status.HTTP_403_FORBIDDEN)
+
+        res_codes = self.client.get(f"/api/v1/admin/imports/{self.batch.uuid}/rows/codes/")
+        self.assertEqual(res_codes.status_code, status.HTTP_403_FORBIDDEN)
+
+    def test_row_codes_endpoint(self):
+        """GET /admin/imports/<batch_uuid>/rows/codes/ returns distinct error codes."""
+        self.authenticate(self.admin)
+        url = f"/api/v1/admin/imports/{self.batch.uuid}/rows/codes/"
+        response = self.client.get(url)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        codes = response.data["data"]
+        self.assertIn("CUSTOMER_NOT_FOUND", codes)
+        self.assertIn("INVALID_AMOUNT", codes)
+        self.assertIn("DUPLICATE_TXN", codes)
+
+    def test_row_codes_filtered_by_outcome(self):
+        """GET /admin/imports/<batch_uuid>/rows/codes/?outcome=REJECTED returns rejected codes only."""
+        self.authenticate(self.admin)
+        url = f"/api/v1/admin/imports/{self.batch.uuid}/rows/codes/?outcome=REJECTED"
+        response = self.client.get(url)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        codes = response.data["data"]
+        self.assertIn("CUSTOMER_NOT_FOUND", codes)
+        self.assertIn("INVALID_AMOUNT", codes)
+        self.assertNotIn("DUPLICATE_TXN", codes)

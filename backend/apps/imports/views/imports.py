@@ -4,6 +4,7 @@ import csv
 
 from django.http import HttpResponse
 from rest_framework import status
+from rest_framework.decorators import action
 from rest_framework.exceptions import NotFound, ValidationError
 from rest_framework.parsers import FormParser, MultiPartParser
 
@@ -126,8 +127,8 @@ class AdminImportRowResultsViewSet(AppModelListAPIViewSet):
         outcome = self.request.query_params.get("outcome")
         if not outcome:
             outcome = "REJECTED"
-        if outcome in {"REJECTED", "SKIPPED_DUPLICATE"}:
-            qs = qs.filter(outcome=outcome)
+        if outcome.upper() in {"REJECTED", "SKIPPED_DUPLICATE"}:
+            qs = qs.filter(outcome=outcome.upper())
 
         code = self.request.query_params.get("code")
         if code:
@@ -138,6 +139,30 @@ class AdminImportRowResultsViewSet(AppModelListAPIViewSet):
             qs = qs.filter(field__icontains=field)
 
         return qs
+
+    @action(detail=False, methods=["GET"], url_path="codes")
+    def codes(self, request, *args, **kwargs):
+        """Returns distinct error_code values for the batch, optionally filtered by outcome."""
+        batch_uuid = self.kwargs.get("batch_uuid")
+        try:
+            batch = ImportBatch.objects.get(uuid=batch_uuid)
+        except (ImportBatch.DoesNotExist, ValueError):
+            raise NotFound(detail=f"Import batch '{batch_uuid}' not found.")
+
+        qs = ImportRowError.objects.filter(batch=batch)
+
+        outcome = request.query_params.get("outcome")
+        if outcome and outcome.upper() in {"REJECTED", "SKIPPED_DUPLICATE"}:
+            qs = qs.filter(outcome=outcome.upper())
+
+        codes = list(
+            qs.exclude(error_code="")
+            .exclude(error_code__isnull=True)
+            .values_list("error_code", flat=True)
+            .distinct()
+            .order_by("error_code")
+        )
+        return self.send_response(codes)
 
     def list(self, request, *args, **kwargs):
         # CSV Export handling

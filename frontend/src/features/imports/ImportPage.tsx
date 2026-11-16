@@ -77,7 +77,11 @@ export const ImportPage: React.FC = () => {
     queryFn: async () => {
       if (!activeBatchUuid) return null;
       const params = new URLSearchParams();
-      if (activeTab !== 'ALL') params.append('outcome', activeTab);
+      if (activeTab !== 'ALL') {
+        params.append('outcome', activeTab);
+      } else {
+        params.append('outcome', 'ALL');
+      }
       if (filterCode.trim()) {
         params.append('code', filterCode.trim());
       }
@@ -151,7 +155,11 @@ export const ImportPage: React.FC = () => {
     setExportError(null);
     try {
       const params = new URLSearchParams();
-      if (activeTab !== 'ALL') params.append('outcome', activeTab);
+      if (activeTab !== 'ALL') {
+        params.append('outcome', activeTab);
+      } else {
+        params.append('outcome', 'ALL');
+      }
       if (filterCode.trim()) {
         params.append('code', filterCode.trim());
       }

@@ -30,6 +30,7 @@ node_modules/
 frontend/dist/
 frontend/build/
 .next/
+.vite/
 
 # Testing
 .pytest_cache/
