@@ -255,7 +255,7 @@ SPECTACULAR_SETTINGS = {
     "TITLE": "FinPilot API",
     "DESCRIPTION": "Internal Investment Portfolio & Goal Monitoring API",
     "VERSION": "1.0.0",
-    "SERVE_PERMISSIONS": ["rest_framework.permissions.IsAdminUser"],
+    "SERVE_PERMISSIONS": ["rest_framework.permissions.AllowAny"],
     "SCHEMA_PATH_PREFIX": "/api/v1/",
 }
 
